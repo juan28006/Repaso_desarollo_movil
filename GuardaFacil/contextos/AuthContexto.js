@@ -5,7 +5,8 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-import { auth } from '../firebase/firebaseConfig';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase/firebaseConfig';
 
 const AuthContexto = createContext(null);
 
@@ -18,7 +19,18 @@ export function AuthContextoProvider({ children }) {
   }), []);
 
   const iniciarSesion = (correo, contrasena) => signInWithEmailAndPassword(auth, correo.trim(), contrasena);
-  const registrarUsuario = (correo, contrasena) => createUserWithEmailAndPassword(auth, correo.trim(), contrasena);
+  const registrarUsuario = async (datos) => {
+    const credencial = await createUserWithEmailAndPassword(auth, datos.correo.trim(), datos.contrasena);
+    await setDoc(doc(db, 'users', credencial.user.uid), {
+      nombreCompleto: datos.nombreCompleto.trim(),
+      cedula: datos.cedula.trim(),
+      telefono: datos.telefono.trim(),
+      correo: datos.correo.trim(),
+      direccion: datos.direccion.trim(),
+      createdAt: serverTimestamp(),
+    });
+    return credencial;
+  };
   const cerrarSesion = () => signOut(auth);
 
   const value = useMemo(() => ({

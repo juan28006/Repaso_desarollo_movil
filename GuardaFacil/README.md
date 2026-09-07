@@ -1,6 +1,6 @@
-# Directorio de Contactos
+# Guarda Fácil
 
-Aplicación móvil desarrollada con Expo y React Native. Incluye un login con Firebase Authentication y una pantalla home protegida.
+Aplicación móvil desarrollada con Expo y React Native para gestionar casilleros inteligentes. Incluye Home, Login y Registro con Firebase Authentication y una pantalla principal protegida.
 
 ## Estructura
 
@@ -12,10 +12,13 @@ GuardaFacil/
 ├── navegacion/
 │   └── NavegacionStack.js          # Stack principal de navegación
 ├── pantallas/
-│   ├── LoginScreen.js               # Inicio de sesión y registro
+│   ├── HomeScreen.js                # Bienvenida pública
+│   ├── LoginScreen.js               # Inicio de sesión
+│   ├── RegistroScreen.js            # Creación de cuenta y perfil
+│   ├── validacionesAuth.js          # Validaciones de Login y Registro
 │   └── ListaScreen.js               # Pantalla home protegida
 ├── firebase/
-│   └── firebaseConfig.js            # Inicialización de Firebase Auth
+│   └── firebaseConfig.js            # Inicialización de Firebase Auth y Firestore
 ├── App.js                           # Punto de entrada
 ├── app.json                         # Configuración de Expo
 ├── package.json                     # Dependencias y scripts
@@ -62,4 +65,4 @@ npm run web
 npm run lint
 ```
 
-La aplicación usa `App.js` como entrada, `NavigationContainer` como contenedor raíz y `NavegacionStack` para mostrar `Login` cuando no hay sesión y `Lista` como home cuando el usuario está autenticado.
+La aplicación usa `App.js` como entrada, `NavigationContainer` como contenedor raíz y `NavegacionStack` para mostrar Home, Login y Registro cuando no hay sesión, y `Lista` cuando el usuario está autenticado. Los datos adicionales del registro se guardan en `users/{uid}` de Cloud Firestore; las contraseñas solo son gestionadas por Firebase Authentication.

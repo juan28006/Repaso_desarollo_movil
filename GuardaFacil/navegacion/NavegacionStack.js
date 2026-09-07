@@ -2,7 +2,9 @@ import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuthContexto } from '../contextos/AuthContexto';
+import HomeScreen from '../pantallas/HomeScreen';
 import LoginScreen from '../pantallas/LoginScreen';
+import RegistroScreen from '../pantallas/RegistroScreen';
 import ListaScreen from '../pantallas/ListaScreen';
 
 const Stack = createNativeStackNavigator();
@@ -19,7 +21,11 @@ export default function NavegacionStack() {
       {usuario ? (
         <Stack.Screen name="Lista" component={ListaScreen} options={{ title: 'Inicio' }} />
       ) : (
-        <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'Iniciar sesión' }} />
+        <Stack.Group>
+          <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'Iniciar sesión' }} />
+          <Stack.Screen name="Registro" component={RegistroScreen} options={{ title: 'Crear cuenta' }} />
+        </Stack.Group>
       )}
     </Stack.Navigator>
   );
