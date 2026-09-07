@@ -1,50 +1,65 @@
-# Welcome to your Expo app 👋
+# Directorio de Contactos
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplicación móvil desarrollada con Expo y React Native. Incluye un login con Firebase Authentication y una pantalla home protegida.
 
-## Get started
+## Estructura
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```text
+GuardaFacil/
+├── assets/                         # Imágenes e iconos de la aplicación
+├── contextos/
+│   └── AuthContexto.js             # Estado de autenticación compartido
+├── navegacion/
+│   └── NavegacionStack.js          # Stack principal de navegación
+├── pantallas/
+│   ├── LoginScreen.js               # Inicio de sesión y registro
+│   └── ListaScreen.js               # Pantalla home protegida
+├── firebase/
+│   └── firebaseConfig.js            # Inicialización de Firebase Auth
+├── App.js                           # Punto de entrada
+├── app.json                         # Configuración de Expo
+├── package.json                     # Dependencias y scripts
+├── .gitignore
+├── .env                             # Variables locales, no se versiona
+└── README.md
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Requisitos
 
-## Learn more
+- Node.js LTS y npm.
+- Una cuenta de Firebase con Authentication habilitado.
+- Expo Go, un emulador Android o un simulador iOS.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Instalación
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Desde `GuardaFacil` instala las dependencias:
 
-## Join the community
+```bash
+npm install
+```
 
-Join our community of developers creating universal apps.
+Configura un archivo `.env` en la raíz con las credenciales de Firebase:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```env
+EXPO_PUBLIC_FIREBASE_API_KEY=tu-api-key
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=tu-proyecto.firebaseapp.com
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=tu-proyecto
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=tu-proyecto.firebasestorage.app
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=tu-messaging-sender-id
+EXPO_PUBLIC_FIREBASE_APP_ID=tu-app-id
+EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=tu-measurement-id
+```
+
+El archivo `.env` está excluido del repositorio. No publiques credenciales reales.
+
+## Ejecutar
+
+```bash
+npx expo start
+npm run android
+npm run ios
+npm run web
+npm run lint
+```
+
+La aplicación usa `App.js` como entrada, `NavigationContainer` como contenedor raíz y `NavegacionStack` para mostrar `Login` cuando no hay sesión y `Lista` como home cuando el usuario está autenticado.
