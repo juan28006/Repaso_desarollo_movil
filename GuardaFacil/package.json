@@ -1,6 +1,6 @@
 {
   "name": "guardafacil",
-  "main": "App.js",
+  "main": "expo/AppEntry.js",
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
