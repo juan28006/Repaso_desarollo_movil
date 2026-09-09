@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { obtenerCasilleros } from '../services/zonasService';
 
 export default function CasillerosScreen({ route, navigation }) {
@@ -24,20 +25,18 @@ export default function CasillerosScreen({ route, navigation }) {
   if (cargando) {
     return (
       <View style={styles.centrado}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#273c9c" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Text style={styles.titulo}>{zonaNombre}</Text>
-      <FlatList
-        data={casilleros}
-        keyExtractor={(item) => item.id}
+      <FlatList data={casilleros}
+        keyExtractor={(item) => item.id} contentContainerStyle={{ paddingBottom: 40 }}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.item}
+          <TouchableOpacity style={styles.item}
             onPress={() =>
               navigation.navigate('DetalleCasillero', {
                 zonaId,
@@ -50,11 +49,8 @@ export default function CasillerosScreen({ route, navigation }) {
               <Text style={styles.numero}>{item.numero}</Text>
               <Text style={styles.tamano}>Tamaño: {item.tamano}</Text>
             </View>
-            <View
-              style={[
-                styles.badge,
-                { backgroundColor: item.disponible ? '#2ecc71' : '#e74c3c' },
-              ]}
+            <View style={[ styles.badge,
+              { backgroundColor: item.disponible ? '#2ecc71' : '#e74c3c' },]}
             >
               <Text style={styles.badgeTexto}>
                 {item.disponible ? 'Disponible' : 'Ocupado'}
@@ -63,25 +59,18 @@ export default function CasillerosScreen({ route, navigation }) {
           </TouchableOpacity>
         )}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
+  container: { flex: 1, padding: 24, backgroundColor: '#f5f7ff' },
   centrado: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  titulo: { fontSize: 22, fontWeight: 'bold', marginBottom: 16 },
-  item: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    marginBottom: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-  },
-  numero: { fontSize: 16, fontWeight: '600' },
-  tamano: { fontSize: 14, color: '#666' },
-  badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
-  badgeTexto: { color: '#fff', fontWeight: '600', fontSize: 12 },
+  titulo: { fontSize: 24, fontWeight: '800', color: '#273c9c', marginBottom: 16 },
+  item: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16,
+    marginBottom: 12, backgroundColor: '#fff', borderColor: '#d2d8ed', borderWidth: 1, borderRadius: 12,},
+  numero: { fontSize: 16, fontWeight: '700', color: '#172044' },
+  tamano: { fontSize: 14, color: '#69728e' },
+  badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+  badgeTexto: { color: '#fff', fontWeight: '700', fontSize: 13 },
 });
