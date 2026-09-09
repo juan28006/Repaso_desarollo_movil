@@ -1,10 +1,3 @@
-# Guarda Fácil
-
-Aplicación móvil desarrollada con Expo y React Native para gestionar casilleros inteligentes. Incluye Home, Login y Registro con Firebase Authentication y una pantalla principal protegida.
-
-## Estructura
-
-```text
 GuardaFacil/
 ├── assets/                         # Imágenes e iconos de la aplicación
 ├── contextos/
