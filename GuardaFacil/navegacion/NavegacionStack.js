@@ -6,6 +6,8 @@ import HomeScreen from '../pantallas/HomeScreen';
 import LoginScreen from '../pantallas/LoginScreen';
 import RegistroScreen from '../pantallas/RegistroScreen';
 import ListaScreen from '../pantallas/ListaScreen';
+import CasillerosScreen from '../pantallas/CasillerosScreen';
+import DetalleCasilleroScreen from '../pantallas/DetalleCasilleroScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -19,7 +21,11 @@ export default function NavegacionStack() {
   return (
     <Stack.Navigator>
       {usuario ? (
-        <Stack.Screen name="Lista" component={ListaScreen} options={{ title: 'Inicio' }} />
+        <>
+          <Stack.Screen name="Lista" component={ListaScreen} options={{ title: 'Inicio' }} />
+          <Stack.Screen name="Casilleros" component={CasillerosScreen} options={{ title: 'Casilleros' }} />
+          <Stack.Screen name="DetalleCasillero" component={DetalleCasilleroScreen} options={{ title: 'Detalle del casillero' }} />
+        </>
       ) : (
         <Stack.Group>
           <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
