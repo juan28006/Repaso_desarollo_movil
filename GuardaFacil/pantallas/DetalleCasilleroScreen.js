@@ -8,7 +8,6 @@ import {
   Pressable,
   Alert,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthContexto } from '../contextos/AuthContexto';
 import { obtenerCasillero, reservarCasillero } from '../services/zonasService';
@@ -29,9 +28,30 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [fecha, setFecha] = useState('');
-  const [mostrarDatePicker, setMostrarDatePicker] = useState(false);
+  const [mostrarListaFechas, setMostrarListaFechas] = useState(false);
   const [franjaSeleccionada, setFranjaSeleccionada] = useState('Mañana');
   const [guardando, setGuardando] = useState(false);
+
+  const opcionesFechas = React.useMemo(() => {
+    const fechaBase = new Date();
+    const lista = [];
+
+    for (let index = 0; index < 10; index += 1) {
+      const fechaActual = new Date(fechaBase);
+      fechaActual.setDate(fechaBase.getDate() + index);
+
+      lista.push({
+        valor: formatearFecha(fechaActual),
+        etiqueta: new Intl.DateTimeFormat('es-ES', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        }).format(fechaActual),
+      });
+    }
+
+    return lista;
+  }, []);
 
   useEffect(() => {
     const cargarCasillero = async () => {
@@ -103,12 +123,9 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
     }
   };
 
-  const onChangeFecha = (_, selectedDate) => {
-    setMostrarDatePicker(false);
-
-    if (selectedDate) {
-      setFecha(formatearFecha(selectedDate));
-    }
+  const onSeleccionarFecha = (valorFecha) => {
+    setFecha(valorFecha);
+    setMostrarListaFechas(false);
   };
 
   if (cargando) {
@@ -172,20 +189,40 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
         <View style={styles.seccion}>
           <Text style={styles.etiqueta}>Reservar casillero</Text>
 
-          <Pressable style={styles.input} onPress={() => setMostrarDatePicker(true)}>
-            <Text style={[styles.inputTexto, !fecha && styles.inputTextoPlaceholder]}>
-              {fecha || 'Selecciona una fecha'}
-            </Text>
+          <Pressable
+            style={styles.input}
+            onPress={() => setMostrarListaFechas((valorActual) => !valorActual)}
+          >
+            <View style={styles.inputContent}>
+              <Text style={[styles.inputTexto, !fecha && styles.inputTextoPlaceholder]}>
+                {fecha || 'Selecciona una fecha'}
+              </Text>
+              <Text style={styles.inputArrow}>{mostrarListaFechas ? '▲' : '▼'}</Text>
+            </View>
           </Pressable>
 
-          {mostrarDatePicker && (
-            <DateTimePicker
-              value={fecha ? new Date(`${fecha}T12:00:00`) : new Date()}
-              mode="date"
-              minimumDate={new Date()}
-              display="default"
-              onChange={onChangeFecha}
-            />
+          {mostrarListaFechas && (
+            <View style={styles.dropdown}>
+              {opcionesFechas.map((opcion) => (
+                <Pressable
+                  key={opcion.valor}
+                  style={[
+                    styles.dropdownItem,
+                    fecha === opcion.valor && styles.dropdownItemActivo,
+                  ]}
+                  onPress={() => onSeleccionarFecha(opcion.valor)}
+                >
+                  <Text
+                    style={[
+                      styles.dropdownItemTexto,
+                      fecha === opcion.valor && styles.dropdownItemTextoActivo,
+                    ]}
+                  >
+                    {opcion.etiqueta}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           )}
 
           <View style={styles.franjasContainer}>
@@ -255,12 +292,48 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 48,
   },
+  inputContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   inputTexto: {
     fontSize: 16,
     color: '#172044',
   },
   inputTextoPlaceholder: {
     color: '#69728e',
+  },
+  inputArrow: {
+    fontSize: 16,
+    color: '#273c9c',
+    fontWeight: '700',
+    marginLeft: 12,
+  },
+  dropdown: {
+    backgroundColor: '#fff',
+    borderColor: '#d2d8ed',
+    borderWidth: 1,
+    borderRadius: 10,
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#edf1fb',
+  },
+  dropdownItemActivo: {
+    backgroundColor: '#eef4ff',
+  },
+  dropdownItemTexto: {
+    fontSize: 15,
+    color: '#172044',
+  },
+  dropdownItemTextoActivo: {
+    color: '#273c9c',
+    fontWeight: '700',
   },
   franjasContainer: {
     flexDirection: 'row',
