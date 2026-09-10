@@ -307,10 +307,10 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
           <Pressable
             style={[
               styles.primaryButton,
-              (guardando || (fecha && !disponibilidad.disponible)) && styles.primaryButtonDisabled,
+              Boolean(guardando || (fecha && !disponibilidad.disponible)) && styles.primaryButtonDisabled,
             ]}
             onPress={manejarReserva}
-            disabled={guardando || (fecha && !disponibilidad.disponible)}
+            disabled={Boolean(guardando || (fecha && !disponibilidad.disponible))}
           >
             <Text style={styles.primaryButtonText}>
               {guardando ? 'Guardando reserva...' : 'Reservar casillero'}
