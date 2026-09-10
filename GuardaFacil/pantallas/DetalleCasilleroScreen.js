@@ -10,7 +10,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthContexto } from '../contextos/AuthContexto';
-import { obtenerCasillero, reservarCasillero } from '../services/zonasService';
+import {
+  obtenerCasillero,
+  reservarCasillero,
+  verificarDisponibilidadCasillero,
+} from '../services/zonasService';
 
 const franjasDisponibles = ['Mañana', 'Tarde', 'Noche'];
 
@@ -31,6 +35,7 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
   const [mostrarListaFechas, setMostrarListaFechas] = useState(false);
   const [franjaSeleccionada, setFranjaSeleccionada] = useState('Mañana');
   const [guardando, setGuardando] = useState(false);
+  const [disponibilidad, setDisponibilidad] = useState({ disponible: true, cargando: false });
 
   const opcionesFechas = React.useMemo(() => {
     const fechaBase = new Date();
@@ -52,6 +57,26 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
 
     return lista;
   }, []);
+
+  async function consultarDisponibilidad(fechaSeleccionada, franjaSeleccionadaActual) {
+    if (!fechaSeleccionada || !franjaSeleccionadaActual) {
+      setDisponibilidad({ disponible: true, cargando: false });
+      return;
+    }
+
+    try {
+      setDisponibilidad({ disponible: true, cargando: true });
+      const disponible = await verificarDisponibilidadCasillero({
+        casilleroId,
+        fecha: fechaSeleccionada,
+        franja: franjaSeleccionadaActual,
+      });
+
+      setDisponibilidad({ disponible, cargando: false });
+    } catch {
+      setDisponibilidad({ disponible: false, cargando: false });
+    }
+  }
 
   useEffect(() => {
     const cargarCasillero = async () => {
@@ -86,6 +111,18 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
 
     try {
       setGuardando(true);
+
+      const disponible = await verificarDisponibilidadCasillero({
+        casilleroId,
+        fecha: fecha.trim(),
+        franja: franjaSeleccionada,
+      });
+
+      if (!disponible) {
+        Alert.alert('Casillero no disponible', 'Ya existe una reserva para esa fecha y franja.');
+        setGuardando(false);
+        return;
+      }
 
       const respuesta = await reservarCasillero({
         zonaId,
@@ -126,6 +163,15 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
   const onSeleccionarFecha = (valorFecha) => {
     setFecha(valorFecha);
     setMostrarListaFechas(false);
+    consultarDisponibilidad(valorFecha, franjaSeleccionada);
+  };
+
+  const onSeleccionarFranja = async (nuevaFranja) => {
+    setFranjaSeleccionada(nuevaFranja);
+
+    if (fecha) {
+      await consultarDisponibilidad(fecha, nuevaFranja);
+    }
   };
 
   if (cargando) {
@@ -152,11 +198,22 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
         <View
           style={[
             styles.badge,
-            { backgroundColor: casillero.disponible ? '#2ecc71' : '#e74c3c' },
+            {
+              backgroundColor:
+                disponibilidad.cargando
+                  ? '#f39c12'
+                  : disponibilidad.disponible
+                    ? '#2ecc71'
+                    : '#e74c3c',
+            },
           ]}
         >
           <Text style={styles.badgeTexto}>
-            {casillero.disponible ? 'Disponible' : 'Ocupado'}
+            {disponibilidad.cargando
+              ? 'Comprobando...'
+              : disponibilidad.disponible
+                ? 'Disponible'
+                : 'Ocupado'}
           </Text>
         </View>
 
@@ -233,7 +290,7 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
                   styles.franjaBoton,
                   franjaSeleccionada === franja && styles.franjaBotonActivo,
                 ]}
-                onPress={() => setFranjaSeleccionada(franja)}
+                onPress={() => onSeleccionarFranja(franja)}
               >
                 <Text
                   style={[
@@ -250,10 +307,10 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
           <Pressable
             style={[
               styles.primaryButton,
-              guardando && styles.primaryButtonDisabled,
+              (guardando || (fecha && !disponibilidad.disponible)) && styles.primaryButtonDisabled,
             ]}
             onPress={manejarReserva}
-            disabled={guardando}
+            disabled={guardando || (fecha && !disponibilidad.disponible)}
           >
             <Text style={styles.primaryButtonText}>
               {guardando ? 'Guardando reserva...' : 'Reservar casillero'}

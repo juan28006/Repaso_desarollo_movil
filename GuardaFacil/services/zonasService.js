@@ -1,4 +1,4 @@
-import { collection, getDocs, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, serverTimestamp, setDoc, query, where } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 
 export const obtenerZonas = async () => {
@@ -43,6 +43,28 @@ export const obtenerCasillero = async (zonaId, casilleroId) => {
     return { id: snapshot.id, ...snapshot.data() };
   } catch (error) {
     console.error('Error al obtener el casillero:', error);
+    throw error;
+  }
+};
+
+export const verificarDisponibilidadCasillero = async ({
+  casilleroId,
+  fecha,
+  franja,
+}) => {
+  try {
+    const reservasRef = collection(db, 'reservas');
+    const consulta = query(
+      reservasRef,
+      where('casilleroId', '==', casilleroId),
+      where('fecha', '==', fecha),
+      where('franja', '==', franja)
+    );
+
+    const snapshot = await getDocs(consulta);
+    return snapshot.empty;
+  } catch (error) {
+    console.error('Error al verificar disponibilidad del casillero:', error);
     throw error;
   }
 };
