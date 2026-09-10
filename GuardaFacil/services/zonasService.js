@@ -1,4 +1,4 @@
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 
 export const obtenerZonas = async () => {
@@ -29,7 +29,7 @@ export const obtenerCasilleros = async (zonaId) => {
     console.error('Error al obtener casilleros:', error);
     throw error;
   }
-  };
+};
 
 export const obtenerCasillero = async (zonaId, casilleroId) => {
   try {
@@ -46,4 +46,53 @@ export const obtenerCasillero = async (zonaId, casilleroId) => {
     throw error;
   }
 };
- 
+
+export const reservarCasillero = async ({
+  zonaId,
+  casilleroId,
+  usuarioId,
+  usuarioEmail,
+  fecha,
+  franja,
+  zonaNombre,
+  casilleroNumero,
+}) => {
+  try {
+    const reservaId = `${usuarioId}_${casilleroId}_${fecha}_${franja}`;
+    const reservaRef = doc(db, 'reservas', reservaId);
+    const reservaExistente = await getDoc(reservaRef);
+
+    if (reservaExistente.exists()) {
+      throw new Error('Ya existe una reserva para este casillero en la fecha y franja seleccionadas.');
+    }
+
+    const reserva = {
+      zonaId,
+      casilleroId,
+      zonaNombre,
+      casilleroNumero,
+      usuarioId,
+      usuarioEmail,
+      fecha,
+      franja,
+      estado: 'confirmada',
+      createdAt: serverTimestamp(),
+    };
+
+    await setDoc(reservaRef, reserva);
+
+    const casilleroRef = doc(db, 'zonas', zonaId, 'casilleros', casilleroId);
+    await updateDoc(casilleroRef, {
+      disponible: false,
+      reservadoPor: usuarioId,
+      reservaFecha: fecha,
+      reservaFranja: franja,
+      estado: 'reservado',
+    });
+
+    return { id: reservaRef.id, ...reserva };
+  } catch (error) {
+    console.error('Error al reservar el casillero:', error);
+    throw error;
+  }
+};
