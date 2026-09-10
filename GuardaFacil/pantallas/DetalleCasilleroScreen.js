@@ -5,15 +5,22 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
-  TextInput,
   Pressable,
   Alert,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthContexto } from '../contextos/AuthContexto';
 import { obtenerCasillero, reservarCasillero } from '../services/zonasService';
 
 const franjasDisponibles = ['Mañana', 'Tarde', 'Noche'];
+
+const formatearFecha = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export default function DetalleCasilleroScreen({ route, navigation }) {
   const { zonaId, casilleroId, zonaNombre } = route.params;
@@ -22,6 +29,7 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [fecha, setFecha] = useState('');
+  const [mostrarDatePicker, setMostrarDatePicker] = useState(false);
   const [franjaSeleccionada, setFranjaSeleccionada] = useState('Mañana');
   const [guardando, setGuardando] = useState(false);
 
@@ -47,12 +55,7 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
     }
 
     if (!fecha.trim()) {
-      Alert.alert('Ingresa una fecha para la reserva.');
-      return;
-    }
-
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha.trim())) {
-      Alert.alert('La fecha debe tener el formato YYYY-MM-DD.');
+      Alert.alert('Selecciona una fecha para la reserva.');
       return;
     }
 
@@ -97,6 +100,14 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
       Alert.alert('No se pudo guardar la reserva', err.message || 'Inténtalo nuevamente.');
     } finally {
       setGuardando(false);
+    }
+  };
+
+  const onChangeFecha = (_, selectedDate) => {
+    setMostrarDatePicker(false);
+
+    if (selectedDate) {
+      setFecha(formatearFecha(selectedDate));
     }
   };
 
@@ -161,14 +172,21 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
         <View style={styles.seccion}>
           <Text style={styles.etiqueta}>Reservar casillero</Text>
 
-          <TextInput
-            style={styles.input}
-            placeholder="YYYY-MM-DD"
-            value={fecha}
-            onChangeText={setFecha}
-            autoCapitalize="none"
-            keyboardType="default"
-          />
+          <Pressable style={styles.input} onPress={() => setMostrarDatePicker(true)}>
+            <Text style={[styles.inputTexto, !fecha && styles.inputTextoPlaceholder]}>
+              {fecha || 'Selecciona una fecha'}
+            </Text>
+          </Pressable>
+
+          {mostrarDatePicker && (
+            <DateTimePicker
+              value={fecha ? new Date(`${fecha}T12:00:00`) : new Date()}
+              mode="date"
+              minimumDate={new Date()}
+              display="default"
+              onChange={onChangeFecha}
+            />
+          )}
 
           <View style={styles.franjasContainer}>
             {franjasDisponibles.map((franja) => (
@@ -195,10 +213,10 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
           <Pressable
             style={[
               styles.primaryButton,
-              (!casillero.disponible || guardando) && styles.primaryButtonDisabled,
+              guardando && styles.primaryButtonDisabled,
             ]}
             onPress={manejarReserva}
-            disabled={!casillero.disponible || guardando}
+            disabled={guardando}
           >
             <Text style={styles.primaryButtonText}>
               {guardando ? 'Guardando reserva...' : 'Reservar casillero'}
@@ -232,10 +250,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    marginBottom: 12,
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  inputTexto: {
     fontSize: 16,
     color: '#172044',
-    marginBottom: 12,
+  },
+  inputTextoPlaceholder: {
+    color: '#69728e',
   },
   franjasContainer: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import { collection, getDocs, doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 
 export const obtenerZonas = async () => {
@@ -58,7 +58,7 @@ export const reservarCasillero = async ({
   casilleroNumero,
 }) => {
   try {
-    const reservaId = `${usuarioId}_${casilleroId}_${fecha}_${franja}`;
+    const reservaId = `${casilleroId}_${fecha}_${franja}`;
     const reservaRef = doc(db, 'reservas', reservaId);
     const reservaExistente = await getDoc(reservaRef);
 
@@ -80,15 +80,6 @@ export const reservarCasillero = async ({
     };
 
     await setDoc(reservaRef, reserva);
-
-    const casilleroRef = doc(db, 'zonas', zonaId, 'casilleros', casilleroId);
-    await updateDoc(casilleroRef, {
-      disponible: false,
-      reservadoPor: usuarioId,
-      reservaFecha: fecha,
-      reservaFranja: franja,
-      estado: 'reservado',
-    });
 
     return { id: reservaRef.id, ...reserva };
   } catch (error) {
