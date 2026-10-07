@@ -17,6 +17,9 @@ import {
   obtenerReservasUsuario,
   puedeCancelarReserva,
 } from '../services/zonasService';
+import { iniciarUsoReserva, puedeIniciarUso } from '../services/usoReservaService';
+import { obtenerEstadoReserva } from '../constantes/estadosReserva';
+import EstadoBadge from '../componentes/estadoBadge';
 
 const franjas = {
   Mañana: '06:00',
@@ -33,14 +36,6 @@ const formatearFecha = (fecha) => {
   }).format(new Date(anio, mes - 1, dia));
 };
 
-const obtenerFechaActual = () => {
-  const ahora = new Date();
-  const anio = ahora.getFullYear();
-  const mes = String(ahora.getMonth() + 1).padStart(2, '0');
-  const dia = String(ahora.getDate()).padStart(2, '0');
-  return `${anio}-${mes}-${dia}`;
-};
-
 export default function MisReservasScreen() {
   const { usuario } = useAuthContexto();
   const [reservas, setReservas] = useState([]);
@@ -49,6 +44,7 @@ export default function MisReservasScreen() {
   const [error, setError] = useState('');
   const [pestana, setPestana] = useState('activas');
   const [cancelandoId, setCancelandoId] = useState(null);
+  const [iniciandoId, setIniciandoId] = useState(null);
 
   const cargarReservas = useCallback(async (mostrarCarga = true) => {
     if (!usuario?.uid) {
@@ -76,14 +72,12 @@ export default function MisReservasScreen() {
     cargarReservas();
   }, [cargarReservas]));
 
-  const fechaActual = obtenerFechaActual();
   const reservasFiltradas = useMemo(() => {
-    const activas = reservas.filter(
-      (reserva) => reserva.estado === 'confirmada' && reserva.fecha >= fechaActual
+    const esActiva = (reserva) => (
+      ['reservado', 'en_uso'].includes(obtenerEstadoReserva(reserva))
     );
-    const historicas = reservas.filter(
-      (reserva) => reserva.estado !== 'confirmada' || reserva.fecha < fechaActual
-    );
+    const activas = reservas.filter(esActiva);
+    const historicas = reservas.filter((reserva) => !esActiva(reserva));
     const seleccionadas = pestana === 'activas' ? activas : historicas;
 
     return seleccionadas.sort((a, b) => {
@@ -94,7 +88,7 @@ export default function MisReservasScreen() {
         ? ordenFecha || ordenFranja
         : -(ordenFecha || ordenFranja);
     });
-  }, [fechaActual, pestana, reservas]);
+  }, [pestana, reservas]);
 
   const refrescar = async () => {
     setActualizando(true);
@@ -135,17 +129,35 @@ export default function MisReservasScreen() {
     );
   };
 
-  const renderEstado = (reserva) => {
-    if (reserva.estado === 'cancelada') {
-      return 'Cancelada';
-    }
-    if (reserva.fecha < fechaActual) {
-      return 'Finalizada';
-    }
-    if (!puedeCancelarReserva(reserva)) {
-      return 'En curso';
-    }
-    return 'Confirmada';
+  const solicitarInicioUso = (reserva) => {
+    Alert.alert(
+      'Iniciar uso',
+      `¿Quieres iniciar el uso del casillero ${reserva.casilleroNumero}?`,
+      [
+        { text: 'Volver', style: 'cancel' },
+        {
+          text: 'Sí, iniciar',
+          onPress: async () => {
+            setIniciandoId(reserva.id);
+            try {
+              await iniciarUsoReserva(reserva.id, usuario.uid);
+              setReservas((actuales) => actuales.map((actual) => (
+                actual.id === reserva.id && actual.origen === reserva.origen
+                  ? { ...actual, estado: 'en_uso' }
+                  : actual
+              )));
+            } catch (err) {
+              Alert.alert(
+                'No se pudo iniciar el uso',
+                err.message || 'Inténtalo nuevamente.'
+              );
+            } finally {
+              setIniciandoId(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (cargando && reservas.length === 0) {
@@ -216,6 +228,8 @@ export default function MisReservasScreen() {
         ) : reservasFiltradas.map((reserva) => {
           const esCancelable = puedeCancelarReserva(reserva);
           const cancelacionEnCurso = cancelandoId === reserva.id;
+          const iniciable = puedeIniciarUso(reserva);
+          const inicioEnCurso = iniciandoId === reserva.id;
 
           return (
             <View
@@ -226,16 +240,7 @@ export default function MisReservasScreen() {
                 <Text style={styles.casillero}>
                   Casillero {reserva.casilleroNumero || reserva.casilleroId}
                 </Text>
-                <Text
-                  style={[
-                    styles.estado,
-                    reserva.estado === 'cancelada' && styles.estadoCancelado,
-                    reserva.fecha < fechaActual && reserva.estado !== 'cancelada'
-                      && styles.estadoFinalizado,
-                  ]}
-                >
-                  {renderEstado(reserva)}
-                </Text>
+                <EstadoBadge reserva={reserva} />
               </View>
               <Text style={styles.detalle}>{reserva.zonaNombre || 'Zona'}</Text>
               <Text style={styles.detalle}>{formatearFecha(reserva.fecha)}</Text>
@@ -255,6 +260,22 @@ export default function MisReservasScreen() {
                 >
                   <Text style={styles.botonCancelarTexto}>
                     {cancelacionEnCurso ? 'Cancelando...' : 'Cancelar reserva'}
+                  </Text>
+                </Pressable>
+              )}
+
+              {iniciable && (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={Boolean(iniciandoId)}
+                  style={[
+                    styles.botonIniciar,
+                    Boolean(iniciandoId) && styles.botonDeshabilitado,
+                  ]}
+                  onPress={() => solicitarInicioUso(reserva)}
+                >
+                  <Text style={styles.botonIniciarTexto}>
+                    {inicioEnCurso ? 'Iniciando...' : 'Iniciar uso'}
                   </Text>
                 </Pressable>
               )}
@@ -299,9 +320,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   casillero: { color: '#172044', fontSize: 17, fontWeight: '800', flexShrink: 1 },
-  estado: { color: '#24804a', fontSize: 13, fontWeight: '700' },
-  estadoCancelado: { color: '#e74c3c' },
-  estadoFinalizado: { color: '#69728e' },
   detalle: { color: '#69728e', fontSize: 14, marginTop: 4 },
   botonCancelar: {
     alignItems: 'center',
@@ -314,6 +332,15 @@ const styles = StyleSheet.create({
   },
   botonDeshabilitado: { opacity: 0.55 },
   botonCancelarTexto: { color: '#c0392b', fontSize: 15, fontWeight: '700' },
+  botonIniciar: {
+    alignItems: 'center',
+    backgroundColor: '#273c9c',
+    borderRadius: 10,
+    justifyContent: 'center',
+    minHeight: 46,
+    marginTop: 14,
+  },
+  botonIniciarTexto: { color: '#fff', fontSize: 15, fontWeight: '700' },
   vacio: {
     alignItems: 'center',
     backgroundColor: '#fff',
