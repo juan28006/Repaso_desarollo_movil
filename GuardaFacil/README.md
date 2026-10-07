@@ -9,7 +9,10 @@ GuardaFacil/
 │   ├── LoginScreen.js               # Inicio de sesión
 │   ├── RegistroScreen.js            # Creación de cuenta y perfil
 │   ├── validacionesAuth.js          # Validaciones de Login y Registro
-│   └── ListaScreen.js               # Pantalla home protegida
+│   ├── ListaScreen.js               # Pantalla home protegida
+│   └── MisReservasScreen.js         # Reservas activas e historial del usuario
+├── services/
+│   └── zonasService.js              # Consultas de zonas, casilleros y reservas
 ├── firebase/
 │   └── firebaseConfig.js            # Inicialización de Firebase Auth y Firestore
 ├── App.js                           # Punto de entrada
@@ -59,3 +62,5 @@ npm run lint
 ```
 
 La aplicación usa `App.js` como entrada, `NavigationContainer` como contenedor raíz y `NavegacionStack` para mostrar Home, Login y Registro cuando no hay sesión, y `Lista` cuando el usuario está autenticado. Los datos adicionales del registro se guardan en `users/{uid}` de Cloud Firestore; las contraseñas solo son gestionadas por Firebase Authentication.
+
+Desde `Lista`, el usuario autenticado puede abrir **Mis reservas** para consultar sus reservas activas y el historial. Las reservas se pueden cancelar hasta el inicio de su franja (Mañana 06:00, Tarde 12:00 y Noche 18:00, hora local del dispositivo); la cancelación requiere confirmación y se conserva para el historial en Firestore.

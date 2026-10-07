@@ -26,6 +26,13 @@ export default function ListaScreen({ navigation }) {
     <View style={styles.container}>
       <Text style={styles.title}>Bienvenido a GuardaFácil</Text>
       <Text style={styles.email}>{usuario?.email}</Text>
+      <Pressable
+        accessibilityRole="button"
+        style={styles.reservasButton}
+        onPress={() => navigation.navigate('MisReservas')}
+      >
+        <Text style={styles.reservasButtonText}>Mis reservas</Text>
+      </Pressable>
       <Text style={styles.description}>Zonas disponibles:</Text>
 
       {cargando ? (
@@ -66,6 +73,16 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: '#172044' },
   email: { color: '#273c9c', fontSize: 16, fontWeight: '600' },
   description: { color: '#69728e', fontSize: 16 },
+  reservasButton: {
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderColor: '#273c9c',
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  reservasButtonText: { color: '#273c9c', fontSize: 15, fontWeight: '700' },
   item: {
     padding: 16,
     marginBottom: 10,

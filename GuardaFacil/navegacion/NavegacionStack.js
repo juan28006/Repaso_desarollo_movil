@@ -8,6 +8,7 @@ import RegistroScreen from '../pantallas/RegistroScreen';
 import ListaScreen from '../pantallas/ListaScreen';
 import CasillerosScreen from '../pantallas/CasillerosScreen';
 import DetalleCasilleroScreen from '../pantallas/DetalleCasilleroScreen';
+import MisReservasScreen from '../pantallas/MisReservasScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -23,6 +24,7 @@ export default function NavegacionStack() {
       {usuario ? (
         <>
           <Stack.Screen name="Lista" component={ListaScreen} options={{ title: 'Inicio' }} />
+          <Stack.Screen name="MisReservas" component={MisReservasScreen} options={{ title: 'Mis reservas' }} />
           <Stack.Screen name="Casilleros" component={CasillerosScreen} options={{ title: 'Casilleros' }} />
           <Stack.Screen name="DetalleCasillero" component={DetalleCasilleroScreen} options={{ title: 'Detalle del casillero' }} />
         </>
