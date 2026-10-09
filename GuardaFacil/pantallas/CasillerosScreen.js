@@ -277,4 +277,9 @@ const styles = StyleSheet.create({
   tamano: { fontSize: 14, color: '#69728e' },
   badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, maxWidth: 190 },
   badgeTexto: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  usuario: {
+    fontSize: 13,
+    color: '#555',
+    marginTop: 4,
+  }
 });

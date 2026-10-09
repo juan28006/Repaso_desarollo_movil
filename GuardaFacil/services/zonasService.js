@@ -187,6 +187,7 @@ export const reservarCasillero = async ({
   casilleroId,
   usuarioId,
   usuarioEmail,
+  usuarioNombre,
   fecha,
   franja,
   zonaNombre,
@@ -199,6 +200,7 @@ export const reservarCasillero = async ({
     const reserva = {
       zonaId,
       casilleroId,
+      usuarioNombre,
       zonaNombre,
       casilleroNumero,
       usuarioId,
@@ -313,4 +315,21 @@ export const cancelarReserva = async (reservaId, usuarioId) => {
     console.error('Error al cancelar la reserva:', error);
     throw error;
   }
+};
+
+export const obtenerUsuarioCasillero = async (casilleroId) => {
+  const reservasRef = collection(db, 'reservas');
+
+  const consulta = query(
+    reservasRef,
+    where('casilleroId', '==', casilleroId)
+  );
+
+  const snapshot = await getDocsFromServer(consulta);
+
+  const reservas = snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(reserva => reserva.estado !== 'cancelada');
+
+  return reservas.length ? reservas[0] : null;
 };

@@ -17,6 +17,7 @@ import {
   verificarDisponibilidadCasillero,
 } from '../services/zonasService';
 import { ejecutarOEncolar } from '../services/offlineQueueService';
+import { obtenerUsuarioCasillero } from '../services/zonasService';
 
 const franjasDisponibles = ['Mañana', 'Tarde', 'Noche'];
 
@@ -40,6 +41,7 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
   const [franjaSeleccionada, setFranjaSeleccionada] = useState('Mañana');
   const [guardando, setGuardando] = useState(false);
   const [disponibilidad, setDisponibilidad] = useState({ disponible: null, cargando: false });
+  const [usuarioActual, setUsuarioActual] = useState(null);
 
   const opcionesFechas = React.useMemo(() => {
     const fechaBase = new Date();
@@ -85,6 +87,11 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
 
   const cargarCasillero = useCallback(async () => {
     try {
+      const reserva = await obtenerUsuarioCasillero(casilleroId);
+
+      if (reserva) {
+        setUsuarioActual(reserva);
+      }
       const resultado = await obtenerCasillero(usuario.uid, zonaId, casilleroId);
       setCasillero(resultado.datos);
       setCacheInfo(resultado);
@@ -138,6 +145,7 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
         casilleroId,
         usuarioId: usuario.uid,
         usuarioEmail: usuario.email,
+        usuarioNombre: usuario.displayName,
         fecha: fecha.trim(),
         franja: franjaSeleccionada,
         zonaNombre,
@@ -263,7 +271,14 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
                   : 'Sin validar'}
           </Text>
         </View>
-
+        <View style={styles.seccion}>
+          <Text style={styles.etiqueta}>Estudiante asignado</Text>
+          <Text style={styles.valor}>
+            {usuarioActual?.usuarioNombre ||
+              usuarioActual?.usuarioEmail ||
+              'Sin asignar'}
+          </Text>
+        </View>
         <View style={styles.seccion}>
           <Text style={styles.etiqueta}>Ubicación</Text>
           <Text style={styles.valor}>{zonaNombre}</Text>
