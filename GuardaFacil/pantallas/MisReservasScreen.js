@@ -44,7 +44,7 @@ const formatearFecha = (fecha) => {
 export default function MisReservasScreen() {
   const { usuario } = useAuthContexto();
   const {
-    conectado,
+    puedeContactarFirestore,
     cola,
     actualizarCola,
   } = useEstadoConexion();
@@ -139,10 +139,10 @@ export default function MisReservasScreen() {
   }, [cargarReservas]));
 
   useEffect(() => {
-    if (!enfocada || !conectado) return undefined;
+    if (!enfocada || !puedeContactarFirestore) return undefined;
     const temporizador = setTimeout(() => cargarReservas(false), 0);
     return () => clearTimeout(temporizador);
-  }, [enfocada, conectado, cola, cargarReservas]);
+  }, [enfocada, puedeContactarFirestore, cola, cargarReservas]);
 
   const reservasFiltradas = useMemo(() => {
     const esActiva = (reserva) => (
@@ -188,7 +188,7 @@ export default function MisReservasScreen() {
                 usuario.uid,
                 'cancelar',
                 { reservaId: reserva.id },
-                conectado === true
+                puedeContactarFirestore
               );
               try {
                 await actualizarCola();
@@ -244,7 +244,7 @@ export default function MisReservasScreen() {
                 usuario.uid,
                 'iniciar_uso',
                 { reservaId: reserva.id },
-                conectado === true
+                puedeContactarFirestore
               );
               try {
                 await actualizarCola();

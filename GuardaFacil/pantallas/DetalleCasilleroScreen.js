@@ -30,7 +30,7 @@ const formatearFecha = (date) => {
 export default function DetalleCasilleroScreen({ route, navigation }) {
   const { zonaId, casilleroId, zonaNombre } = route.params;
   const { usuario } = useAuthContexto();
-  const { conectado, actualizarCola } = useEstadoConexion();
+  const { conectado, puedeContactarFirestore, actualizarCola } = useEstadoConexion();
   const [casillero, setCasillero] = useState(null);
   const [cacheInfo, setCacheInfo] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -63,7 +63,7 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
   }, []);
 
   const consultarDisponibilidad = useCallback(async (fechaSeleccionada, franjaSeleccionadaActual) => {
-    if (!fechaSeleccionada || !franjaSeleccionadaActual || conectado !== true) {
+    if (!fechaSeleccionada || !franjaSeleccionadaActual || !puedeContactarFirestore) {
       setDisponibilidad({ disponible: null, cargando: false });
       return;
     }
@@ -81,7 +81,7 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
       console.error('No se pudo validar la disponibilidad en Firestore:', error);
       setDisponibilidad({ disponible: null, cargando: false });
     }
-  }, [casilleroId, conectado]);
+  }, [casilleroId, puedeContactarFirestore]);
 
   const cargarCasillero = useCallback(async () => {
     try {
@@ -147,7 +147,7 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
         usuario.uid,
         'reservar',
         payloadReserva,
-        conectado === true
+        puedeContactarFirestore
       );
       try {
         await actualizarCola();
@@ -243,12 +243,13 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
           style={[
             styles.badge,
             {
-              backgroundColor:
-                disponibilidad.cargando
-                  ? '#f39c12'
-                  : disponibilidad.disponible
-                    ? '#2ecc71'
-                    : '#e74c3c',
+              backgroundColor: disponibilidad.cargando
+                ? '#f39c12'
+                : disponibilidad.disponible === true
+                  ? '#2ecc71'
+                  : disponibilidad.disponible === false
+                    ? '#e74c3c'
+                    : '#7f8c8d',
             },
           ]}
         >
@@ -355,10 +356,10 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
           <Pressable
             style={[
               styles.primaryButton,
-              Boolean(guardando || (conectado && fecha && disponibilidad.disponible === false)) && styles.primaryButtonDisabled,
+              Boolean(guardando || (puedeContactarFirestore && fecha && disponibilidad.disponible === false)) && styles.primaryButtonDisabled,
             ]}
             onPress={manejarReserva}
-            disabled={Boolean(guardando || (conectado && fecha && disponibilidad.disponible === false))}
+            disabled={Boolean(guardando || (puedeContactarFirestore && fecha && disponibilidad.disponible === false))}
           >
             <Text style={styles.primaryButtonText}>
               {guardando ? 'Guardando reserva...' : 'Reservar casillero'}

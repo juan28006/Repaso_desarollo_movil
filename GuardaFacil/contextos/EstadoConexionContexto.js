@@ -32,6 +32,8 @@ export function EstadoConexionProvider({ children }) {
       : estadoRed.isInternetReachable === true
         ? true
         : null;
+  const puedeContactarFirestore = estadoRed?.isConnected === true
+    && estadoRed?.isInternetReachable !== false;
   const colaLista = !uid || (estadoCola.uid === uid && estadoCola.lista);
 
   const sincronizar = useCallback(async (reintentarConflictos = false) => {
@@ -58,11 +60,11 @@ export function EstadoConexionProvider({ children }) {
     } finally {
       bloqueo.current.delete(uid);
       setSincronizando(false);
-      if (repetirSincronizacion.current.delete(uid) && conectado === true) {
+      if (repetirSincronizacion.current.delete(uid) && puedeContactarFirestore) {
         setTimeout(() => sincronizar(), 0);
       }
     }
-  }, [uid, usuario, conectado]);
+  }, [uid, usuario, puedeContactarFirestore]);
 
   const actualizarCola = useCallback(async () => {
     if (!uid) {
@@ -71,9 +73,9 @@ export function EstadoConexionProvider({ children }) {
     }
     const operaciones = await obtenerColaOffline(uid);
     setEstadoCola({ uid, items: operaciones, lista: true });
-    if (conectado === true) setTimeout(sincronizar, 0);
+    if (puedeContactarFirestore) setTimeout(sincronizar, 0);
     return operaciones;
-  }, [uid, conectado, sincronizar]);
+  }, [uid, puedeContactarFirestore, sincronizar]);
 
   useEffect(() => {
     let activa = true;
@@ -120,26 +122,36 @@ export function EstadoConexionProvider({ children }) {
   }, [uid]);
 
   useEffect(() => {
-    if (!uid || !colaLista || !conectado) return undefined;
+    if (!uid || !colaLista || !puedeContactarFirestore) return undefined;
     const temporizador = setTimeout(sincronizar, 0);
     return () => clearTimeout(temporizador);
-  }, [uid, colaLista, conectado, sincronizar]);
+  }, [uid, colaLista, puedeContactarFirestore, sincronizar]);
 
   useEffect(() => {
     const suscripcion = AppState.addEventListener('change', (estado) => {
-      if (estado === 'active' && uid && conectado) sincronizar();
+      if (estado === 'active' && uid && puedeContactarFirestore) sincronizar();
     });
     return () => suscripcion.remove();
-  }, [uid, conectado, sincronizar]);
+  }, [uid, puedeContactarFirestore, sincronizar]);
 
   const value = useMemo(() => ({
     conectado,
+    puedeContactarFirestore,
     estadoRed,
     cola: estadoCola.uid === uid ? estadoCola.items : [],
     sincronizando,
     actualizarCola,
     reintentarSincronizacion: () => sincronizar(true),
-  }), [conectado, estadoRed, estadoCola, uid, sincronizando, actualizarCola, sincronizar]);
+  }), [
+    conectado,
+    puedeContactarFirestore,
+    estadoRed,
+    estadoCola,
+    uid,
+    sincronizando,
+    actualizarCola,
+    sincronizar,
+  ]);
 
   return (
     <EstadoConexionContexto.Provider value={value}>

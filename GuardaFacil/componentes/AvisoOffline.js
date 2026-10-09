@@ -14,6 +14,7 @@ export default function AvisoOffline({ desdeCache = false, actualizadoEn = null,
   const { usuario } = useAuthContexto();
   const {
     conectado,
+    puedeContactarFirestore,
     cola,
     sincronizando,
     reintentarSincronizacion,
@@ -82,7 +83,7 @@ export default function AvisoOffline({ desdeCache = false, actualizadoEn = null,
           )}
         </View>
       ))}
-      {conectado && cola.length > 0 && (
+      {puedeContactarFirestore && cola.length > 0 && (
         <Pressable
           accessibilityRole="button"
           disabled={sincronizando}
