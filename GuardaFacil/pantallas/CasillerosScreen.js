@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuthContexto } from '../contextos/AuthContexto';
+import { useEstadoConexion } from '../contextos/EstadoConexionContexto';
+import AvisoOffline from '../componentes/AvisoOffline';
 import { obtenerCasilleros } from '../services/zonasService';
 
 const OPCIONES_DISPONIBILIDAD = [
@@ -32,25 +35,37 @@ function Chip({ etiqueta, activo, onPress }) {
 
 export default function CasillerosScreen({ route, navigation }) {
   const { zonaId, zonaNombre } = route.params;
+  const { usuario } = useAuthContexto();
+  const { conectado } = useEstadoConexion();
   const [casilleros, setCasilleros] = useState([]);
+  const [cacheInfo, setCacheInfo] = useState(null);
+  const [error, setError] = useState('');
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState('');
   const [tamanoFiltro, setTamanoFiltro] = useState('todos');
   const [disponibilidad, setDisponibilidad] = useState('todos');
 
+  const cargarCasilleros = useCallback(async () => {
+    setCargando(true);
+    try {
+      const resultado = await obtenerCasilleros(usuario.uid, zonaId);
+      setCasilleros(resultado.datos);
+      setCacheInfo(resultado);
+      setError('');
+    } catch (err) {
+      console.error('Error cargando casilleros:', err);
+      setCasilleros([]);
+      setCacheInfo(null);
+      setError('No se pudieron cargar los casilleros. Comprueba la conexión e inténtalo de nuevo.');
+    } finally {
+      setCargando(false);
+    }
+  }, [usuario, zonaId]);
+
   useEffect(() => {
-    const cargarCasilleros = async () => {
-      try {
-        const datos = await obtenerCasilleros(zonaId);
-        setCasilleros(datos);
-      } catch (error) {
-        console.error('Error cargando casilleros:', error);
-      } finally {
-        setCargando(false);
-      }
-    };
-    cargarCasilleros();
-  }, [zonaId]);
+    const temporizador = setTimeout(cargarCasilleros, 0);
+    return () => clearTimeout(temporizador);
+  }, [cargarCasilleros, conectado]);
 
   // Los hooks van antes del return condicional de "cargando"
   const tamanos = useMemo(
@@ -71,6 +86,7 @@ export default function CasillerosScreen({ route, navigation }) {
 
   const hayFiltros =
     busqueda !== '' || tamanoFiltro !== 'todos' || disponibilidad !== 'todos';
+  const disponibilidadDesactualizada = cacheInfo?.desdeCache || conectado === false;
 
   const limpiarFiltros = () => {
     setBusqueda('');
@@ -89,6 +105,27 @@ export default function CasillerosScreen({ route, navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.titulo}>{zonaNombre}</Text>
+      <AvisoOffline
+        desdeCache={cacheInfo?.desdeCache}
+        actualizadoEn={cacheInfo?.actualizadoEn}
+        cacheError={cacheInfo?.cacheError}
+      />
+      {error && casilleros.length === 0 && (
+        <View style={styles.vacio}>
+          <Text style={styles.vacioTexto}>{error}</Text>
+          <TouchableOpacity
+            onPress={() => {
+              setCargando(true);
+              cargarCasilleros();
+            }}
+          >
+            <Text style={styles.limpiar}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      {error && casilleros.length > 0 && (
+        <Text style={styles.vacioTexto}>{error} Se muestran los datos guardados.</Text>
+      )}
 
       <TextInput
         style={styles.buscador}
@@ -125,11 +162,13 @@ export default function CasillerosScreen({ route, navigation }) {
         ))}
       </View>
 
-      <Text style={styles.contador}>
-        {casillerosFiltrados.length} de {casilleros.length} casilleros
-      </Text>
+      {(!error || casilleros.length > 0) && (
+        <Text style={styles.contador}>
+          {casillerosFiltrados.length} de {casilleros.length} casilleros
+        </Text>
+      )}
 
-      <FlatList
+      {(!error || casilleros.length > 0) && <FlatList
         style={{ flex: 1 }}
         data={casillerosFiltrados}
         keyExtractor={(item) => item.id}
@@ -167,16 +206,26 @@ export default function CasillerosScreen({ route, navigation }) {
             <View
               style={[
                 styles.badge,
-                { backgroundColor: item.disponible ? '#2ecc71' : '#e74c3c' },
+                {
+                  backgroundColor: disponibilidadDesactualizada
+                    ? '#b7791f'
+                    : item.disponible
+                      ? '#2ecc71'
+                      : '#e74c3c',
+                },
               ]}
             >
               <Text style={styles.badgeTexto}>
-                {item.disponible ? 'Disponible' : 'Ocupado'}
+                {disponibilidadDesactualizada
+                  ? `Último estado guardado: ${item.disponible ? 'disponible' : 'ocupado'}`
+                  : item.disponible
+                    ? 'Disponible'
+                    : 'Ocupado'}
               </Text>
             </View>
           </TouchableOpacity>
         )}
-      />
+      />}
     </SafeAreaView>
   );
 }
@@ -226,6 +275,6 @@ const styles = StyleSheet.create({
   },
   numero: { fontSize: 16, fontWeight: '700', color: '#172044' },
   tamano: { fontSize: 14, color: '#69728e' },
-  badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+  badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, maxWidth: 190 },
   badgeTexto: { color: '#fff', fontWeight: '700', fontSize: 13 },
 });

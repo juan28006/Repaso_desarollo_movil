@@ -6,6 +6,8 @@ export const ESTADOS_RESERVA = {
   finalizado: { etiqueta: 'Finalizado', color: '#16a085' },
   vencido: { etiqueta: 'Vencido', color: '#7f8c8d' },
   cancelado: { etiqueta: 'Cancelado', color: '#e74c3c' },
+  pendiente_validacion: { etiqueta: 'Pendiente de validación', color: '#b7791f' },
+  conflicto_validacion: { etiqueta: 'Conflicto por resolver', color: '#a12d22' },
 };
 
 // Hora en que termina cada franja. Si la Noche llega hasta las 6 a. m.
@@ -27,6 +29,8 @@ export const obtenerFinReserva = (reserva) => {
 };
 
 export const obtenerEstadoReserva = (reserva, ahora = new Date()) => {
+  if (reserva.estado === 'pendiente_validacion') return 'pendiente_validacion';
+  if (reserva.estado === 'conflicto_validacion') return 'conflicto_validacion';
   if (reserva.estado === 'cancelada') return 'cancelado';
   if (reserva.estado === 'finalizada') return 'finalizado';
 

@@ -9,6 +9,7 @@ import ListaScreen from '../pantallas/ListaScreen';
 import CasillerosScreen from '../pantallas/CasillerosScreen';
 import DetalleCasilleroScreen from '../pantallas/DetalleCasilleroScreen';
 import MisReservasScreen from '../pantallas/MisReservasScreen';
+import IndicadorConexion from '../componentes/IndicadorConexion';
 
 const Stack = createNativeStackNavigator();
 
@@ -20,7 +21,9 @@ export default function NavegacionStack() {
   }
 
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      screenOptions={usuario ? { headerRight: () => <IndicadorConexion /> } : undefined}
+    >
       {usuario ? (
         <>
           <Stack.Screen name="Lista" component={ListaScreen} options={{ title: 'Inicio' }} />

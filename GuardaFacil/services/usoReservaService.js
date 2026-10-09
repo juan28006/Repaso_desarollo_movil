@@ -1,5 +1,5 @@
 import { doc, runTransaction, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase/firebaseConfig';
+import { auth, db } from '../firebase/firebaseConfig';
 import { obtenerInicioUsoReserva } from './zonasService';
 import { obtenerFinReserva } from '../constantes/estadosReserva';
 
@@ -18,23 +18,36 @@ export const puedeIniciarUso = (reserva, ahora = new Date()) => {
 
 export const iniciarUsoReserva = async (reservaId, usuarioId) => {
   try {
+    if (auth.currentUser?.uid !== usuarioId) {
+      const error = new Error('La sesión cambió; no se iniciará una operación con otra cuenta.');
+      error.code = 'uid-mismatch';
+      throw error;
+    }
     const reservaRef = doc(db, 'reservas', reservaId);
 
     await runTransaction(db, async (transaction) => {
       const snapshot = await transaction.get(reservaRef);
 
       if (!snapshot.exists()) {
-        throw new Error('La reserva ya no existe.');
+        const error = new Error('La reserva ya no existe.');
+        error.code = 'operation-conflict';
+        throw error;
       }
 
       const reserva = snapshot.data();
 
       if (reserva.usuarioId !== usuarioId) {
-        throw new Error('No tienes permiso para iniciar esta reserva.');
+        const error = new Error('No tienes permiso para iniciar esta reserva.');
+        error.code = 'operation-conflict';
+        throw error;
       }
 
+      if (reserva.estado === 'en_uso') return;
+
       if (!puedeIniciarUso(reserva)) {
-        throw new Error('Solo puedes iniciar el uso durante la franja de tu reserva.');
+        const error = new Error('Solo puedes iniciar el uso durante la franja de tu reserva.');
+        error.code = 'operation-conflict';
+        throw error;
       }
 
       transaction.update(reservaRef, {

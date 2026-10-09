@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,15 +9,20 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthContexto } from '../contextos/AuthContexto';
+import { useEstadoConexion } from '../contextos/EstadoConexionContexto';
+import AvisoOffline from '../componentes/AvisoOffline';
 import {
-  cancelarReserva,
   obtenerReservasUsuario,
   puedeCancelarReserva,
 } from '../services/zonasService';
-import { iniciarUsoReserva, puedeIniciarUso } from '../services/usoReservaService';
+import { puedeIniciarUso } from '../services/usoReservaService';
+import {
+  ejecutarOEncolar,
+  obtenerColaOffline,
+} from '../services/offlineQueueService';
 import { obtenerEstadoReserva } from '../constantes/estadosReserva';
 import EstadoBadge from '../componentes/estadoBadge';
 
@@ -38,7 +43,19 @@ const formatearFecha = (fecha) => {
 
 export default function MisReservasScreen() {
   const { usuario } = useAuthContexto();
-  const [reservas, setReservas] = useState([]);
+  const {
+    conectado,
+    cola,
+    actualizarCola,
+  } = useEstadoConexion();
+  const enfocada = useIsFocused();
+  const [reservasState, setReservasState] = useState({ uid: null, items: [] });
+  const [cacheState, setCacheState] = useState({ uid: null, resultado: null });
+  const reservas = useMemo(
+    () => (reservasState.uid === usuario?.uid ? reservasState.items : []),
+    [reservasState, usuario?.uid]
+  );
+  const cacheInfo = cacheState.uid === usuario?.uid ? cacheState.resultado : null;
   const [cargando, setCargando] = useState(true);
   const [actualizando, setActualizando] = useState(false);
   const [error, setError] = useState('');
@@ -48,7 +65,6 @@ export default function MisReservasScreen() {
 
   const cargarReservas = useCallback(async (mostrarCarga = true) => {
     if (!usuario?.uid) {
-      setReservas([]);
       setCargando(false);
       return;
     }
@@ -59,9 +75,59 @@ export default function MisReservasScreen() {
     setError('');
 
     try {
-      setReservas(await obtenerReservasUsuario(usuario.uid));
+      const [cargaReservas, operaciones] = await Promise.all([
+        obtenerReservasUsuario(usuario.uid)
+          .then((resultado) => ({ resultado }))
+          .catch((error) => ({ error })),
+        obtenerColaOffline(usuario.uid),
+      ]);
+      const reservasLocales = operaciones
+        .filter((operacion) => operacion.tipo === 'reservar')
+        .map((operacion) => ({
+          ...operacion.datos,
+          id: `${operacion.datos.casilleroId}_${operacion.datos.fecha}_${operacion.datos.franja}`,
+          estado: operacion.estado === 'conflicto'
+            ? 'conflicto_validacion'
+            : 'pendiente_validacion',
+          origen: 'local',
+          operacionId: operacion.id,
+        }));
+      const resultado = cargaReservas.resultado || {
+        datos: [],
+        desdeCache: true,
+        actualizadoEn: null,
+      };
+      const pendientesPorId = new Map(
+        reservasLocales.map((reserva) => [reserva.id, reserva])
+      );
+      const reservasMostradas = resultado.datos.map((reserva) => (
+        pendientesPorId.get(reserva.id)
+          ? { ...pendientesPorId.get(reserva.id), origen: 'local' }
+          : reserva
+      ));
+      const idsMostrados = new Set(reservasMostradas.map((reserva) => reserva.id));
+      setReservasState({
+        uid: usuario.uid,
+        items: [
+          ...reservasMostradas,
+          ...reservasLocales.filter((reserva) => !idsMostrados.has(reserva.id)),
+        ],
+      });
+      setCacheState({ uid: usuario.uid, resultado });
+      if (cargaReservas.error) {
+        console.error('No se pudieron actualizar las reservas:', cargaReservas.error);
+        setError('No se pudieron actualizar las reservas; se muestran los datos locales disponibles.');
+      }
     } catch (err) {
       console.error('Error cargando mis reservas:', err);
+      setCacheState((actual) => (
+        actual.uid === usuario.uid && actual.resultado
+          ? {
+            uid: usuario.uid,
+            resultado: { ...actual.resultado, desdeCache: true, error: err.message },
+          }
+          : actual
+      ));
       setError('No se pudieron cargar tus reservas. Inténtalo de nuevo.');
     } finally {
       setCargando(false);
@@ -72,9 +138,16 @@ export default function MisReservasScreen() {
     cargarReservas();
   }, [cargarReservas]));
 
+  useEffect(() => {
+    if (!enfocada || !conectado) return undefined;
+    const temporizador = setTimeout(() => cargarReservas(false), 0);
+    return () => clearTimeout(temporizador);
+  }, [enfocada, conectado, cola, cargarReservas]);
+
   const reservasFiltradas = useMemo(() => {
     const esActiva = (reserva) => (
-      ['reservado', 'en_uso'].includes(obtenerEstadoReserva(reserva))
+      ['reservado', 'en_uso', 'pendiente_validacion', 'conflicto_validacion']
+        .includes(obtenerEstadoReserva(reserva))
     );
     const activas = reservas.filter(esActiva);
     const historicas = reservas.filter((reserva) => !esActiva(reserva));
@@ -92,8 +165,11 @@ export default function MisReservasScreen() {
 
   const refrescar = async () => {
     setActualizando(true);
-    await cargarReservas(false);
-    setActualizando(false);
+    try {
+      await cargarReservas(false);
+    } finally {
+      setActualizando(false);
+    }
   };
 
   const solicitarCancelacion = (reserva) => {
@@ -108,13 +184,37 @@ export default function MisReservasScreen() {
           onPress: async () => {
             setCancelandoId(reserva.id);
             try {
-              await cancelarReserva(reserva.id, usuario.uid);
-              setReservas((actuales) => actuales.map((actual) => (
-                actual.id === reserva.id && actual.origen === reserva.origen
-                  ? { ...actual, estado: 'cancelada' }
+              const resultado = await ejecutarOEncolar(
+                usuario.uid,
+                'cancelar',
+                { reservaId: reserva.id },
+                conectado === true
+              );
+              try {
+                await actualizarCola();
+              } catch (error) {
+                console.error('No se pudo refrescar la cola después de cancelar:', error);
+              }
+              setReservasState((actual) => (
+                actual.uid === usuario.uid
+                  ? {
+                    ...actual,
+                    items: actual.items.map((item) => (
+                      item.id === reserva.id && item.origen === reserva.origen
+                        ? resultado.pendiente
+                          ? { ...item, cancelacionPendiente: true }
+                          : { ...item, estado: 'cancelada' }
+                        : item
+                    )),
+                  }
                   : actual
-              )));
-              Alert.alert('Reserva cancelada', 'La reserva se agregó a tu historial.');
+              ));
+              Alert.alert(
+                resultado.pendiente ? 'Cancelación pendiente de validación' : 'Reserva cancelada',
+                resultado.pendiente
+                  ? 'La solicitud se guardó en este dispositivo y se validará con Firestore al recuperar la conexión.'
+                  : 'La reserva se agregó a tu historial.'
+              );
             } catch (err) {
               Alert.alert(
                 'No se pudo cancelar la reserva',
@@ -140,12 +240,37 @@ export default function MisReservasScreen() {
           onPress: async () => {
             setIniciandoId(reserva.id);
             try {
-              await iniciarUsoReserva(reserva.id, usuario.uid);
-              setReservas((actuales) => actuales.map((actual) => (
-                actual.id === reserva.id && actual.origen === reserva.origen
-                  ? { ...actual, estado: 'en_uso' }
+              const resultado = await ejecutarOEncolar(
+                usuario.uid,
+                'iniciar_uso',
+                { reservaId: reserva.id },
+                conectado === true
+              );
+              try {
+                await actualizarCola();
+              } catch (error) {
+                console.error('No se pudo refrescar la cola después de iniciar el uso:', error);
+              }
+              setReservasState((actual) => (
+                actual.uid === usuario.uid
+                  ? {
+                    ...actual,
+                    items: actual.items.map((item) => (
+                      item.id === reserva.id && item.origen === reserva.origen
+                        ? resultado.pendiente
+                          ? { ...item, inicioUsoPendiente: true }
+                          : { ...item, estado: 'en_uso' }
+                        : item
+                    )),
+                  }
                   : actual
-              )));
+              ));
+              if (resultado.pendiente) {
+                Alert.alert(
+                  'Inicio de uso pendiente de validación',
+                  'La solicitud se guardó en este dispositivo y se validará con Firestore al recuperar la conexión.'
+                );
+              }
             } catch (err) {
               Alert.alert(
                 'No se pudo iniciar el uso',
@@ -182,6 +307,14 @@ export default function MisReservasScreen() {
       >
         <Text style={styles.titulo}>Mis reservas</Text>
         <Text style={styles.descripcion}>Consulta tus reservas y su estado.</Text>
+        <AvisoOffline
+          desdeCache={cacheInfo?.desdeCache}
+          actualizadoEn={cacheInfo?.actualizadoEn}
+          cacheError={cacheInfo?.cacheError}
+        />
+        {error && reservas.length > 0 && (
+          <Text style={styles.errorTexto}>{error}</Text>
+        )}
 
         <View style={styles.pestanas}>
           {[
@@ -207,7 +340,7 @@ export default function MisReservasScreen() {
           ))}
         </View>
 
-        {error ? (
+        {error && reservas.length === 0 ? (
           <View style={styles.vacio}>
             <Text style={styles.errorTexto}>{error}</Text>
             <Pressable style={styles.reintentar} onPress={() => cargarReservas()}>
@@ -247,6 +380,12 @@ export default function MisReservasScreen() {
               <Text style={styles.detalle}>
                 {reserva.franja}{franjas[reserva.franja] ? ` · ${franjas[reserva.franja]}` : ''}
               </Text>
+              {reserva.cancelacionPendiente && (
+                <Text style={styles.detallePendiente}>Cancelación pendiente de validación</Text>
+              )}
+              {reserva.inicioUsoPendiente && (
+                <Text style={styles.detallePendiente}>Inicio de uso pendiente de validación</Text>
+              )}
 
               {esCancelable && (
                 <Pressable
@@ -321,6 +460,7 @@ const styles = StyleSheet.create({
   },
   casillero: { color: '#172044', fontSize: 17, fontWeight: '800', flexShrink: 1 },
   detalle: { color: '#69728e', fontSize: 14, marginTop: 4 },
+  detallePendiente: { color: '#9b6400', fontSize: 13, fontWeight: '700', marginTop: 8 },
   botonCancelar: {
     alignItems: 'center',
     borderColor: '#e74c3c',

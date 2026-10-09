@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthContexto } from '../contextos/AuthContexto';
+import { useEstadoConexion } from '../contextos/EstadoConexionContexto';
+import AvisoOffline from '../componentes/AvisoOffline';
 import {
   obtenerCasillero,
-  reservarCasillero,
   verificarDisponibilidadCasillero,
 } from '../services/zonasService';
+import { ejecutarOEncolar } from '../services/offlineQueueService';
 
 const franjasDisponibles = ['Mañana', 'Tarde', 'Noche'];
 
@@ -28,14 +30,16 @@ const formatearFecha = (date) => {
 export default function DetalleCasilleroScreen({ route, navigation }) {
   const { zonaId, casilleroId, zonaNombre } = route.params;
   const { usuario } = useAuthContexto();
+  const { conectado, actualizarCola } = useEstadoConexion();
   const [casillero, setCasillero] = useState(null);
+  const [cacheInfo, setCacheInfo] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [fecha, setFecha] = useState('');
   const [mostrarListaFechas, setMostrarListaFechas] = useState(false);
   const [franjaSeleccionada, setFranjaSeleccionada] = useState('Mañana');
   const [guardando, setGuardando] = useState(false);
-  const [disponibilidad, setDisponibilidad] = useState({ disponible: true, cargando: false });
+  const [disponibilidad, setDisponibilidad] = useState({ disponible: null, cargando: false });
 
   const opcionesFechas = React.useMemo(() => {
     const fechaBase = new Date();
@@ -58,14 +62,14 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
     return lista;
   }, []);
 
-  async function consultarDisponibilidad(fechaSeleccionada, franjaSeleccionadaActual) {
-    if (!fechaSeleccionada || !franjaSeleccionadaActual) {
-      setDisponibilidad({ disponible: true, cargando: false });
+  const consultarDisponibilidad = useCallback(async (fechaSeleccionada, franjaSeleccionadaActual) => {
+    if (!fechaSeleccionada || !franjaSeleccionadaActual || conectado !== true) {
+      setDisponibilidad({ disponible: null, cargando: false });
       return;
     }
 
     try {
-      setDisponibilidad({ disponible: true, cargando: true });
+      setDisponibilidad({ disponible: null, cargando: true });
       const disponible = await verificarDisponibilidadCasillero({
         casilleroId,
         fecha: fechaSeleccionada,
@@ -73,25 +77,42 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
       });
 
       setDisponibilidad({ disponible, cargando: false });
-    } catch {
-      setDisponibilidad({ disponible: false, cargando: false });
+    } catch (error) {
+      console.error('No se pudo validar la disponibilidad en Firestore:', error);
+      setDisponibilidad({ disponible: null, cargando: false });
     }
-  }
+  }, [casilleroId, conectado]);
+
+  const cargarCasillero = useCallback(async () => {
+    try {
+      const resultado = await obtenerCasillero(usuario.uid, zonaId, casilleroId);
+      setCasillero(resultado.datos);
+      setCacheInfo(resultado);
+      setError(null);
+    } catch (err) {
+      console.error('Error cargando el casillero:', err);
+      setCasillero(null);
+      setCacheInfo(null);
+      setError('No se pudo cargar el casillero. Comprueba la conexión e inténtalo de nuevo.');
+    } finally {
+      setCargando(false);
+    }
+  }, [usuario, zonaId, casilleroId]);
 
   useEffect(() => {
-    const cargarCasillero = async () => {
-      try {
-        const datos = await obtenerCasillero(zonaId, casilleroId);
-        setCasillero(datos);
-      } catch {
-        setError('No se pudo cargar el casillero.');
-      } finally {
-        setCargando(false);
-      }
-    };
+    if (!usuario?.uid) return undefined;
+    const temporizador = setTimeout(cargarCasillero, 0);
+    return () => clearTimeout(temporizador);
+  }, [usuario?.uid, conectado, cargarCasillero]);
 
-    cargarCasillero();
-  }, [zonaId, casilleroId]);
+  useEffect(() => {
+    if (!fecha) return undefined;
+    const temporizador = setTimeout(
+      () => consultarDisponibilidad(fecha, franjaSeleccionada),
+      0
+    );
+    return () => clearTimeout(temporizador);
+  }, [conectado, fecha, franjaSeleccionada, consultarDisponibilidad]);
 
   const manejarReserva = async () => {
     if (!usuario) {
@@ -112,19 +133,7 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
     try {
       setGuardando(true);
 
-      const disponible = await verificarDisponibilidadCasillero({
-        casilleroId,
-        fecha: fecha.trim(),
-        franja: franjaSeleccionada,
-      });
-
-      if (!disponible) {
-        Alert.alert('Casillero no disponible', 'Ya existe una reserva para esa fecha y franja.');
-        setGuardando(false);
-        return;
-      }
-
-      const respuesta = await reservarCasillero({
+      const payloadReserva = {
         zonaId,
         casilleroId,
         usuarioId: usuario.uid,
@@ -133,19 +142,39 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
         franja: franjaSeleccionada,
         zonaNombre,
         casilleroNumero: casillero.numero,
-      });
+      };
+      const respuesta = await ejecutarOEncolar(
+        usuario.uid,
+        'reservar',
+        payloadReserva,
+        conectado === true
+      );
+      try {
+        await actualizarCola();
+      } catch (error) {
+        console.error('No se pudo refrescar el indicador de operaciones pendientes:', error);
+      }
+
+      if (respuesta.pendiente) {
+        Alert.alert(
+          'Reserva pendiente de validación',
+          'La solicitud se guardó en este dispositivo. No está confirmada y se comprobará con Firestore cuando vuelva la conexión.',
+          [{ text: 'Aceptar', onPress: () => navigation.goBack() }]
+        );
+        return;
+      }
 
       setCasillero((casilleroActual) => ({
         ...casilleroActual,
         disponible: false,
         estado: 'reservado',
-        reservaFecha: respuesta.fecha,
-        reservaFranja: respuesta.franja,
+        reservaFecha: respuesta.resultado.fecha,
+        reservaFranja: respuesta.resultado.franja,
       }));
 
       Alert.alert(
         'Reserva guardada',
-        `El casillero ${casillero.numero} quedó reservado para ${respuesta.fecha} en la franja ${respuesta.franja}.`,
+        `El casillero ${casillero.numero} quedó reservado para ${respuesta.resultado.fecha} en la franja ${respuesta.resultado.franja}.`,
         [
           {
             text: 'Aceptar',
@@ -182,10 +211,19 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
     );
   }
 
-  if (error || !casillero) {
+  if (!casillero) {
     return (
       <View style={styles.centrado}>
         <Text style={styles.errorTexto}>{error || 'Casillero no encontrado.'}</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            setCargando(true);
+            cargarCasillero();
+          }}
+        >
+          <Text style={styles.reintentar}>Reintentar</Text>
+        </Pressable>
       </View>
     );
   }
@@ -194,6 +232,12 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.numero}>{casillero.numero}</Text>
+        {error && <Text style={styles.errorTexto}>{error} Se muestran los datos guardados.</Text>}
+        <AvisoOffline
+          desdeCache={cacheInfo?.desdeCache}
+          actualizadoEn={cacheInfo?.actualizadoEn}
+          cacheError={cacheInfo?.cacheError}
+        />
 
         <View
           style={[
@@ -211,9 +255,11 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
           <Text style={styles.badgeTexto}>
             {disponibilidad.cargando
               ? 'Comprobando...'
-              : disponibilidad.disponible
+              : disponibilidad.disponible === true
                 ? 'Disponible'
-                : 'Ocupado'}
+                : disponibilidad.disponible === false
+                  ? 'Ocupado'
+                  : 'Sin validar'}
           </Text>
         </View>
 
@@ -228,7 +274,9 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
         </View>
 
         <View style={styles.seccion}>
-          <Text style={styles.etiqueta}>Estado</Text>
+          <Text style={styles.etiqueta}>
+            {cacheInfo?.desdeCache || conectado === false ? 'Último estado guardado' : 'Estado'}
+          </Text>
           <Text style={styles.valor}>{casillero.estado || 'Disponible'}</Text>
         </View>
 
@@ -307,10 +355,10 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
           <Pressable
             style={[
               styles.primaryButton,
-              Boolean(guardando || (fecha && !disponibilidad.disponible)) && styles.primaryButtonDisabled,
+              Boolean(guardando || (conectado && fecha && disponibilidad.disponible === false)) && styles.primaryButtonDisabled,
             ]}
             onPress={manejarReserva}
-            disabled={Boolean(guardando || (fecha && !disponibilidad.disponible))}
+            disabled={Boolean(guardando || (conectado && fecha && disponibilidad.disponible === false))}
           >
             <Text style={styles.primaryButtonText}>
               {guardando ? 'Guardando reserva...' : 'Reservar casillero'}
@@ -428,4 +476,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   errorTexto: { fontSize: 16, color: '#e74c3c', fontWeight: '600' },
+  reintentar: { color: '#273c9c', fontSize: 14, fontWeight: '700', marginTop: 12 },
 });

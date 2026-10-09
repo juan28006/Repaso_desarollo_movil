@@ -1,14 +1,16 @@
 import {
   collection,
-  getDocs,
+  getDocsFromServer,
   doc,
-  getDoc,
+  getDocFromServer,
   serverTimestamp,
   query,
   where,
   runTransaction,
 } from 'firebase/firestore';
-import { db } from '../firebase/firebaseConfig';
+import { auth, db } from '../firebase/firebaseConfig';
+import { guardarCacheUsuario, leerCacheUsuario } from './offlineStorage';
+import { esErrorDeRed } from './offlineErrors';
 
 const horasInicioFranjas = {
   Mañana: 6,
@@ -47,48 +49,113 @@ export const puedeCancelarReserva = (reserva, ahora = new Date()) => {
   return reserva.estado === 'confirmada' && inicio !== null && ahora < inicio;
 };
 
-export const obtenerZonas = async () => {
-  try {
-    const zonasRef = collection(db, 'zonas');
-    const snapshot = await getDocs(zonasRef);
-    const zonas = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    return zonas;
-  } catch (error) {
-    console.error('Error al obtener zonas:', error);
+const validarSesion = (usuarioId) => {
+  if (!usuarioId || auth.currentUser?.uid !== usuarioId) {
+    const error = new Error('La sesión cambió; no se devolverán datos de otra cuenta.');
+    error.code = 'uid-mismatch';
     throw error;
   }
 };
 
-export const obtenerCasilleros = async (zonaId) => {
+const leerConCache = async (usuarioId, recurso, consultarServidor) => {
+  validarSesion(usuarioId);
+
   try {
-    const casillerosRef = collection(db, 'zonas', zonaId, 'casilleros');
-    const snapshot = await getDocs(casillerosRef);
-    const casilleros = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    return casilleros;
+    const datos = await consultarServidor();
+    validarSesion(usuarioId);
+    let actualizadoEn = Date.now();
+    let cacheError = null;
+    try {
+      const registro = await guardarCacheUsuario(usuarioId, recurso, datos);
+      actualizadoEn = registro.actualizadoEn;
+    } catch (error) {
+      console.error(`No se pudo guardar la caché local (${recurso}):`, error);
+      cacheError = 'No se pudo guardar una copia local de estos datos.';
+    }
+    validarSesion(usuarioId);
+    return { datos, actualizadoEn, desdeCache: false, cacheError };
   } catch (error) {
-    console.error('Error al obtener casilleros:', error);
+    console.error(`No se pudieron consultar los datos de Firestore (${recurso}):`, error);
+    if (error.code === 'uid-mismatch') throw error;
+    if (!esErrorDeRed(error)) throw error;
+    validarSesion(usuarioId);
+    const cache = await leerCacheUsuario(usuarioId, recurso);
+    validarSesion(usuarioId);
+    if (cache && Array.isArray(cache.datos)) {
+      return {
+        datos: cache.datos,
+        actualizadoEn: cache.actualizadoEn,
+        desdeCache: true,
+        error: error.message || 'No fue posible actualizar los datos.',
+      };
+    }
     throw error;
   }
 };
 
-export const obtenerCasillero = async (zonaId, casilleroId) => {
+export const obtenerZonas = (usuarioId) => (
+  leerConCache(usuarioId, 'zonas', async () => {
+    const snapshot = await getDocsFromServer(collection(db, 'zonas'));
+    return snapshot.docs.map((documento) => ({
+      id: documento.id,
+      ...documento.data(),
+    }));
+  })
+);
+
+export const obtenerCasilleros = (usuarioId, zonaId) => (
+  leerConCache(usuarioId, `casilleros:${zonaId}`, async () => {
+    const referencia = collection(db, 'zonas', zonaId, 'casilleros');
+    const snapshot = await getDocsFromServer(referencia);
+    return snapshot.docs.map((documento) => ({
+      id: documento.id,
+      ...documento.data(),
+    }));
+  })
+);
+
+export const obtenerCasillero = async (usuarioId, zonaId, casilleroId) => {
   try {
+    validarSesion(usuarioId);
     const casilleroRef = doc(db, 'zonas', zonaId, 'casilleros', casilleroId);
-    const snapshot = await getDoc(casilleroRef);
+    const snapshot = await getDocFromServer(casilleroRef);
+    validarSesion(usuarioId);
 
     if (!snapshot.exists()) {
-      throw new Error('El casillero no existe');
+      const error = new Error('El casillero no existe');
+      error.code = 'not-found';
+      throw error;
     }
 
-    return { id: snapshot.id, ...snapshot.data() };
+    const casillero = { id: snapshot.id, ...snapshot.data() };
+    const recurso = `casilleros:${zonaId}`;
+    let cacheError = null;
+    try {
+      const cache = await leerCacheUsuario(usuarioId, recurso);
+      const casilleros = (cache?.datos || []).filter((item) => item.id !== casilleroId);
+      await guardarCacheUsuario(usuarioId, recurso, [...casilleros, casillero]);
+    } catch (error) {
+      console.error(`No se pudo actualizar la caché del casillero ${casilleroId}:`, error);
+      cacheError = 'No se pudo guardar una copia local de este casillero.';
+    }
+    validarSesion(usuarioId);
+    return { datos: casillero, actualizadoEn: Date.now(), desdeCache: false, cacheError };
   } catch (error) {
-    console.error('Error al obtener el casillero:', error);
+    console.error(`No se pudo consultar el casillero ${casilleroId}:`, error);
+    if (error.code === 'uid-mismatch') throw error;
+    if (!esErrorDeRed(error)) throw error;
+    validarSesion(usuarioId);
+    const cache = await leerCacheUsuario(usuarioId, `casilleros:${zonaId}`);
+    validarSesion(usuarioId);
+    const casillero = cache?.datos?.find((item) => item.id === casilleroId);
+    if (casillero) {
+      return {
+        datos: casillero,
+        actualizadoEn: cache.actualizadoEn,
+        desdeCache: true,
+        error: error.message || 'No fue posible actualizar el casillero.',
+      };
+    }
     throw error;
   }
 };
@@ -107,7 +174,7 @@ export const verificarDisponibilidadCasillero = async ({
       where('franja', '==', franja)
     );
 
-    const snapshot = await getDocs(consulta);
+    const snapshot = await getDocsFromServer(consulta);
     return snapshot.docs.every((documento) => documento.data().estado === 'cancelada');
   } catch (error) {
     console.error('Error al verificar disponibilidad del casillero:', error);
@@ -126,6 +193,7 @@ export const reservarCasillero = async ({
   casilleroNumero,
 }) => {
   try {
+    validarSesion(usuarioId);
     const reservaId = `${casilleroId}_${fecha}_${franja}`;
     const reservaRef = doc(db, 'reservas', reservaId);
     const reserva = {
@@ -143,14 +211,24 @@ export const reservarCasillero = async ({
 
     const historialRef = doc(collection(db, 'historial_reservas'));
 
-    await runTransaction(db, async (transaction) => {
+    const resultado = await runTransaction(db, async (transaction) => {
       const reservaExistente = await transaction.get(reservaRef);
 
       if (reservaExistente.exists()) {
         const datosExistentes = reservaExistente.data();
 
         if (datosExistentes.estado !== 'cancelada') {
-          throw new Error('Ya existe una reserva para este casillero en la fecha y franja seleccionadas.');
+          if (
+            datosExistentes.usuarioId === usuarioId
+            && datosExistentes.fecha === fecha
+            && datosExistentes.franja === franja
+          ) {
+            return { id: reservaRef.id, ...datosExistentes };
+          }
+
+          const error = new Error('Ya existe una reserva para este casillero en la fecha y franja seleccionadas.');
+          error.code = 'reservation-conflict';
+          throw error;
         }
 
         transaction.set(historialRef, {
@@ -160,24 +238,25 @@ export const reservarCasillero = async ({
       }
 
       transaction.set(reservaRef, reserva);
+      return { id: reservaRef.id, ...reserva };
     });
 
-    return { id: reservaRef.id, ...reserva };
+    return resultado;
   } catch (error) {
     console.error('Error al reservar el casillero:', error);
     throw error;
   }
 };
 
-export const obtenerReservasUsuario = async (usuarioId) => {
-  try {
+export const obtenerReservasUsuario = (usuarioId) => (
+  leerConCache(usuarioId, 'reservas', async () => {
     const reservasRef = collection(db, 'reservas');
     const historialRef = collection(db, 'historial_reservas');
     const consultaReservas = query(reservasRef, where('usuarioId', '==', usuarioId));
     const consultaHistorial = query(historialRef, where('usuarioId', '==', usuarioId));
     const [reservas, historial] = await Promise.all([
-      getDocs(consultaReservas),
-      getDocs(consultaHistorial),
+      getDocsFromServer(consultaReservas),
+      getDocsFromServer(consultaHistorial),
     ]);
 
     return [
@@ -192,31 +271,37 @@ export const obtenerReservasUsuario = async (usuarioId) => {
         ...documento.data(),
       })),
     ];
-  } catch (error) {
-    console.error('Error al obtener las reservas del usuario:', error);
-    throw error;
-  }
-};
+  })
+);
 
 export const cancelarReserva = async (reservaId, usuarioId) => {
   try {
+    validarSesion(usuarioId);
     const reservaRef = doc(db, 'reservas', reservaId);
 
     await runTransaction(db, async (transaction) => {
       const snapshot = await transaction.get(reservaRef);
 
       if (!snapshot.exists()) {
-        throw new Error('La reserva ya no existe.');
+        const error = new Error('La reserva ya no existe.');
+        error.code = 'operation-conflict';
+        throw error;
       }
 
       const reserva = snapshot.data();
 
       if (reserva.usuarioId !== usuarioId) {
-        throw new Error('No tienes permiso para cancelar esta reserva.');
+        const error = new Error('No tienes permiso para cancelar esta reserva.');
+        error.code = 'operation-conflict';
+        throw error;
       }
 
+      if (reserva.estado === 'cancelada') return;
+
       if (!puedeCancelarReserva(reserva)) {
-        throw new Error('Ya inició el uso o la reserva no se puede cancelar.');
+        const error = new Error('Ya inició el uso o la reserva no se puede cancelar.');
+        error.code = 'operation-conflict';
+        throw error;
       }
 
       transaction.update(reservaRef, {
