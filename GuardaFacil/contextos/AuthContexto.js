@@ -1,53 +1,90 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { peticion } from '../services/apiClient';
 import {
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-} from 'firebase/auth';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase/firebaseConfig';
+  alExpirarSesion,
+  borrarSesion,
+  cargarSesion,
+  guardarSesion,
+  obtenerSesion,
+} from '../services/sesion';
 
 const AuthContexto = createContext(null);
+
+const guardarRespuesta = async (respuesta) => {
+  await guardarSesion({
+    idToken: respuesta.idToken,
+    refreshToken: respuesta.refreshToken,
+    expiraEn: respuesta.expiraEn,
+    usuario: respuesta.usuario,
+  });
+  return respuesta.usuario;
+};
 
 export function AuthContextoProvider({ children }) {
   const [usuario, setUsuario] = useState(null);
   const [cargando, setCargando] = useState(true);
-  useEffect(() => onAuthStateChanged(auth, (usuarioActual) => {
-    setUsuario(usuarioActual);
-    setCargando(false);
-  }), []);
 
-  const iniciarSesion = (correo, contrasena) => signInWithEmailAndPassword(auth, correo.trim(), contrasena);
-  const registrarUsuario = async (datos) => {
-    // 1) Crear cuenta
-    const credencial = await createUserWithEmailAndPassword(auth, datos.correo.trim(), datos.contrasena);
+  useEffect(() => {
+    let activa = true;
+    const quitarEscucha = alExpirarSesion(() => {
+      if (activa) setUsuario(null);
+    });
 
-    try {
-      // 2) Guardar perfil
-      await setDoc(doc(db, 'users', credencial.user.uid), {
-        nombreCompleto: datos.nombreCompleto.trim(),
-        cedula: datos.cedula.trim(),
-        telefono: datos.telefono.trim(),
-        correo: datos.correo.trim(),
-        direccion: datos.direccion.trim(),
-        createdAt: serverTimestamp(),
-      });
-      return credencial;
-    } catch (error) {
-      // 3) Rollback: sin perfil no hay registro válido (elimina la cuenta y desloguea)
-      try { await credencial.user.delete(); } catch {}
-      throw error;
-    }
-  };
-  const cerrarSesion = () => signOut(auth);
+    (async () => {
+      const sesion = await cargarSesion();
+      if (!activa) return;
+      // Se abre con la sesión guardada aunque no haya conexión (modo offline).
+      setUsuario(sesion?.usuario ?? null);
+      setCargando(false);
+      if (!sesion) return;
+
+      try {
+        // Actualiza el rol por si un administrador lo cambió mientras la app estaba cerrada.
+        const perfil = await peticion('GET', '/auth/me');
+        const actual = obtenerSesion();
+        if (!activa || !actual) return;
+        await guardarSesion({ ...actual, usuario: perfil });
+        setUsuario(perfil);
+      } catch {
+        // Sin conexión o sesión caducada (ya notificada): se conserva lo guardado.
+      }
+    })();
+
+    return () => {
+      activa = false;
+      quitarEscucha();
+    };
+  }, []);
 
   const value = useMemo(() => ({
     usuario,
+    rol: usuario?.rol ?? null,
     cargando,
-    iniciarSesion,
-    registrarUsuario,
-    cerrarSesion,
+    iniciarSesion: async (correo, contrasena) => {
+      const respuesta = await peticion('POST', '/auth/login', {
+        cuerpo: { correo: correo.trim(), contrasena },
+        sinAuth: true,
+      });
+      setUsuario(await guardarRespuesta(respuesta));
+    },
+    registrarUsuario: async (datos) => {
+      const respuesta = await peticion('POST', '/auth/registro', {
+        cuerpo: {
+          nombreCompleto: datos.nombreCompleto.trim(),
+          cedula: datos.cedula.trim(),
+          telefono: datos.telefono.trim(),
+          correo: datos.correo.trim(),
+          direccion: datos.direccion.trim(),
+          contrasena: datos.contrasena,
+        },
+        sinAuth: true,
+      });
+      setUsuario(await guardarRespuesta(respuesta));
+    },
+    cerrarSesion: async () => {
+      await borrarSesion();
+      setUsuario(null);
+    },
   }), [usuario, cargando]);
 
   return <AuthContexto.Provider value={value}>{children}</AuthContexto.Provider>;

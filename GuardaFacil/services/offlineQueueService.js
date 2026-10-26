@@ -1,68 +1,30 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { auth } from '../firebase/firebaseConfig';
+// Cola de operaciones hechas sin conexión (reservar, cancelar, iniciar uso).
+// Se guarda en SQLite (offlineDb) y se envía a la API cuando vuelve la conexión.
+import { esErrorDeRed, estadoErrorOperacion } from './offlineErrors';
 import {
-  cancelarReserva,
-  obtenerReservasUsuario,
-  reservarCasillero,
-} from './zonasService';
+  actualizarCacheUsuario,
+  actualizarOperacionCola,
+  eliminarOperacionCola,
+  insertarOperacion,
+  listarCola,
+} from './offlineDb';
+import { uidActual } from './sesion';
+import { cancelarReserva, obtenerReservasUsuario, reservarCasillero } from './zonasService';
 import { iniciarUsoReserva } from './usoReservaService';
-import { actualizarCacheUsuario, claveColaUsuario } from './offlineStorage';
-import { esErrorDeRed } from './offlineErrors';
 
-const bloqueosCola = new Map();
 const sincronizacionesActivas = new Set();
 const cierresSesionEnCurso = new Set();
 
-const conBloqueoCola = async (uid, trabajo) => {
-  const previo = bloqueosCola.get(uid) || Promise.resolve();
-  let liberar;
-  const bloqueo = new Promise((resolve) => {
-    liberar = resolve;
-  });
-  bloqueosCola.set(uid, bloqueo);
-  await previo;
-
-  try {
-    return await trabajo();
-  } finally {
-    liberar();
-    if (bloqueosCola.get(uid) === bloqueo) bloqueosCola.delete(uid);
-  }
+const errorSesion = (mensaje) => {
+  const error = new Error(mensaje);
+  error.code = 'uid-mismatch';
+  return error;
 };
 
-const leerCola = async (uid) => {
-  const valor = await AsyncStorage.getItem(claveColaUsuario(uid));
-  if (!valor) return [];
-
-  let cola;
-  try {
-    cola = JSON.parse(valor);
-  } catch (error) {
-    console.error('No se pudo interpretar la cola offline:', error);
-    throw new Error('La cola local está dañada y no se pudo recuperar.');
-  }
-
-  if (!Array.isArray(cola)) {
-    throw new Error('La cola local tiene un formato inválido.');
-  }
-
-  return cola.map((operacion) => (
-    operacion.estado === 'sincronizando'
-      ? { ...operacion, estado: 'pendiente' }
-      : operacion
-  ));
-};
-
-const guardarCola = (uid, cola) => (
-  AsyncStorage.setItem(claveColaUsuario(uid), JSON.stringify(cola))
-);
-
-const idReserva = ({ casilleroId, fecha, franja }) => (
-  `${casilleroId}_${fecha}_${franja}`
-);
+const idReserva = ({ casilleroId, fecha, franja }) => `${casilleroId}_${fecha}_${franja}`;
 
 export async function obtenerColaOffline(uid) {
-  return leerCola(uid);
+  return listarCola(uid);
 }
 
 export async function cerrarSesionSinSincronizacionActiva(uid, cerrarSesion) {
@@ -77,68 +39,46 @@ export async function cerrarSesionSinSincronizacionActiva(uid, cerrarSesion) {
   }
 }
 
-export async function descartarConflictoOffline(uid, operacionId) {
-  if (auth.currentUser?.uid !== uid) {
-    throw new Error('La sesión cambió; no se modificó la cola de otra cuenta.');
+export async function descartarOperacionOffline(uid, operacionId) {
+  if (uidActual() !== uid) throw errorSesion('La sesión cambió; no se modificó la cola de otra cuenta.');
+  const cola = await listarCola(uid);
+  const operacion = cola.find((item) => item.id === operacionId);
+  if (!operacion || !['conflicto', 'rechazada'].includes(operacion.estado)) {
+    throw new Error('Solo se pueden descartar operaciones rechazadas o en conflicto.');
   }
-  return conBloqueoCola(uid, async () => {
-    if (auth.currentUser?.uid !== uid) {
-      throw new Error('La sesión cambió; no se modificó la cola de otra cuenta.');
-    }
-    const cola = await leerCola(uid);
-    const operacion = cola.find((item) => item.id === operacionId);
-    if (!operacion || operacion.estado !== 'conflicto') {
-      throw new Error('Solo se pueden descartar explícitamente operaciones en conflicto.');
-    }
-    await guardarCola(uid, cola.filter((item) => item.id !== operacionId));
-  });
+  await eliminarOperacionCola(uid, operacionId);
 }
 
 export async function agregarOperacionOffline(uid, tipo, datos) {
-  if (auth.currentUser?.uid !== uid) {
-    throw new Error('La sesión cambió; no se guardó la operación bajo otra cuenta.');
-  }
-  return conBloqueoCola(uid, async () => {
-    if (auth.currentUser?.uid !== uid) {
-      throw new Error('La sesión cambió; no se guardó la operación bajo otra cuenta.');
-    }
-    const id = tipo === 'reservar'
-      ? idReserva(datos)
-      : datos.reservaId;
-    const operacionId = `${tipo}:${id}`;
-    const cola = await leerCola(uid);
-    const existente = cola.find((operacion) => operacion.id === operacionId);
-    if (existente?.estado === 'conflicto') {
-      const error = new Error(
-        'Esta solicitud tiene un conflicto. Resuélvelo desde el aviso de operaciones pendientes.'
-      );
-      error.code = 'operation-conflict';
-      throw error;
-    }
-    if (existente) return existente;
+  if (uidActual() !== uid) throw errorSesion('La sesión cambió; no se guardó la operación bajo otra cuenta.');
 
-    const operacion = {
-      id: operacionId,
-      uid,
-      tipo,
-      datos,
-      estado: 'pendiente',
-      intentos: 0,
-      creadaEn: Date.now(),
-    };
-    await guardarCola(uid, [...cola, operacion]);
-    return operacion;
+  const id = tipo === 'reservar' ? idReserva(datos) : datos.reservaId;
+  const operacion = await insertarOperacion({
+    id: `${tipo}:${id}`,
+    uid,
+    tipo,
+    datos,
+    creadaEn: Date.now(),
   });
+
+  if (['conflicto', 'rechazada'].includes(operacion.estado)) {
+    const error = new Error(
+      operacion.estado === 'conflicto'
+        ? 'Esta solicitud tiene un conflicto. Resuélvelo desde el aviso de operaciones pendientes.'
+        : 'El servidor rechazó esta solicitud. Descártala antes de crear otra.'
+    );
+    error.code = operacion.estado === 'conflicto' ? 'operation-conflict' : 'operation-rejected';
+    throw error;
+  }
+  return operacion;
 }
 
 async function procesarOperacion(operacion, uid) {
   if (operacion.uid !== uid) {
     throw new Error('La operación pertenece a otra cuenta y no se enviará.');
   }
-  if (auth.currentUser?.uid !== uid) {
-    const error = new Error('La sesión cambió; la operación permanece vinculada a su cuenta.');
-    error.code = 'uid-mismatch';
-    throw error;
+  if (uidActual() !== uid) {
+    throw errorSesion('La sesión cambió; la operación permanece vinculada a su cuenta.');
   }
 
   if (operacion.tipo === 'reservar') {
@@ -156,6 +96,7 @@ async function procesarOperacion(operacion, uid) {
   throw error;
 }
 
+// `resultado` es la reserva ya calculada por la API (con estado, flags e instantes).
 async function actualizarCacheTrasConfirmacion(uid, operacion, resultado) {
   try {
     await actualizarCacheUsuario(uid, 'reservas', (reservas) => {
@@ -164,19 +105,17 @@ async function actualizarCacheTrasConfirmacion(uid, operacion, resultado) {
       }
 
       if (operacion.tipo === 'reservar') {
-        const reserva = { ...resultado };
-        delete reserva.createdAt;
-        const confirmada = { ...reserva, origen: 'reservas' };
+        // Si un gestor reservó para otra persona, no pertenece a "Mis reservas".
+        if (resultado.usuarioId !== uid) return reservas;
         return [
-          ...reservas.filter((item) => item.id !== confirmada.id),
-          confirmada,
+          ...reservas.filter((item) => item.id !== resultado.id),
+          { ...resultado, origen: 'reservas' },
         ];
       }
 
-      const estado = operacion.tipo === 'cancelar' ? 'cancelada' : 'en_uso';
       return reservas.map((reserva) => (
         reserva.id === operacion.datos.reservaId
-          ? { ...reserva, estado }
+          ? { ...reserva, ...resultado, origen: reserva.origen }
           : reserva
       ));
     });
@@ -187,16 +126,9 @@ async function actualizarCacheTrasConfirmacion(uid, operacion, resultado) {
   try {
     await obtenerReservasUsuario(uid);
   } catch (error) {
-    console.error('La operación se confirmó, pero no se pudo refrescar la caché desde Firestore:', error);
+    console.error('La operación se confirmó, pero no se pudo refrescar la caché desde la API:', error);
   }
 }
-
-const esConflicto = (error) => (
-  error.code === 'reservation-conflict'
-  || error.code === 'operation-conflict'
-  || error.code === 'permission-denied'
-  || error.code === 'failed-precondition'
-);
 
 export async function ejecutarOEncolar(uid, tipo, datos, conectado) {
   if (!conectado) {
@@ -216,55 +148,37 @@ export async function ejecutarOEncolar(uid, tipo, datos, conectado) {
   }
 }
 
-const actualizarOperacion = async (uid, id, actualizar) => {
-  return conBloqueoCola(uid, async () => {
-    const cola = await leerCola(uid);
-    const actualizada = cola.map((operacion) => (
-      operacion.id === id ? actualizar(operacion) : operacion
-    ));
-    await guardarCola(uid, actualizada);
-    return actualizada;
-  });
-};
-
 export async function sincronizarColaOffline(uid, { reintentarConflictos = false } = {}) {
-  if (cierresSesionEnCurso.has(uid)) return leerCola(uid);
+  if (cierresSesionEnCurso.has(uid)) return listarCola(uid);
   sincronizacionesActivas.add(uid);
   try {
-    const inicial = await leerCola(uid);
+    const inicial = await listarCola(uid);
     const procesables = inicial.filter((operacion) => (
-      operacion.estado !== 'conflicto' || reintentarConflictos
+      operacion.estado === 'pendiente'
+      || (operacion.estado === 'conflicto' && reintentarConflictos)
     ));
 
     for (const operacion of procesables) {
-      const actual = await actualizarOperacion(uid, operacion.id, (item) => ({
-        ...item,
+      await actualizarOperacionCola(uid, operacion.id, {
         estado: 'sincronizando',
-        intentos: item.intentos + 1,
         ultimoError: null,
-      }));
-      const operacionActual = actual.find((item) => item.id === operacion.id);
-      if (!operacionActual) continue;
+        sumarIntento: true,
+      });
 
       try {
-        const resultado = await procesarOperacion(operacionActual, uid);
-        await actualizarCacheTrasConfirmacion(uid, operacionActual, resultado);
-
-        await conBloqueoCola(uid, async () => {
-          const colaActual = await leerCola(uid);
-          await guardarCola(uid, colaActual.filter((item) => item.id !== operacion.id));
-        });
+        const resultado = await procesarOperacion(operacion, uid);
+        await actualizarCacheTrasConfirmacion(uid, operacion, resultado);
+        await eliminarOperacionCola(uid, operacion.id);
       } catch (error) {
         console.error(`No se pudo sincronizar ${operacion.id}:`, error);
-        await actualizarOperacion(uid, operacion.id, (item) => ({
-          ...item,
-          estado: esConflicto(error) ? 'conflicto' : 'pendiente',
-          ultimoError: error.message || 'Error al sincronizar con Firestore.',
-        }));
-        if (esErrorDeRed(error) || error.code === 'uid-mismatch') break;
+        await actualizarOperacionCola(uid, operacion.id, {
+          estado: estadoErrorOperacion(error),
+          ultimoError: error.message || 'Error al sincronizar con el servidor.',
+        });
+        if (esErrorDeRed(error) || error.code === 'uid-mismatch' || error.status === 401) break;
       }
     }
-    return leerCola(uid);
+    return listarCola(uid);
   } finally {
     sincronizacionesActivas.delete(uid);
   }

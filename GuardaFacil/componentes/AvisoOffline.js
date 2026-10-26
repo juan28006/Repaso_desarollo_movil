@@ -2,7 +2,7 @@ import React from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuthContexto } from '../contextos/AuthContexto';
 import { useEstadoConexion } from '../contextos/EstadoConexionContexto';
-import { descartarConflictoOffline } from '../services/offlineQueueService';
+import { descartarOperacionOffline } from '../services/offlineQueueService';
 
 const ETIQUETAS_OPERACION = {
   reservar: 'Reserva pendiente de validación',
@@ -14,7 +14,7 @@ export default function AvisoOffline({ desdeCache = false, actualizadoEn = null,
   const { usuario } = useAuthContexto();
   const {
     conectado,
-    puedeContactarFirestore,
+    puedeContactarApi,
     cola,
     sincronizando,
     reintentarSincronizacion,
@@ -41,7 +41,9 @@ export default function AvisoOffline({ desdeCache = false, actualizadoEn = null,
       {cola.map((operacion) => (
         <View key={operacion.id}>
           <Text style={styles.detalle}>
-            {ETIQUETAS_OPERACION[operacion.tipo] || 'Operación pendiente'}
+            {operacion.estado === 'rechazada'
+              ? 'Operación rechazada'
+              : ETIQUETAS_OPERACION[operacion.tipo] || 'Operación pendiente'}
             {operacion.datos?.casilleroNumero
               ? ` · Casillero ${operacion.datos.casilleroNumero} · ${operacion.datos.fecha} · ${operacion.datos.franja}`
               : operacion.datos?.reservaId
@@ -49,16 +51,20 @@ export default function AvisoOffline({ desdeCache = false, actualizadoEn = null,
                 : ''}
             {operacion.estado === 'conflicto'
               ? ` · Conflicto: ${operacion.ultimoError}`
-              : operacion.estado === 'error' || operacion.ultimoError
+              : operacion.estado === 'rechazada'
+                ? ` · ${operacion.ultimoError}`
+                : operacion.estado === 'error' || operacion.ultimoError
                 ? ` · ${operacion.ultimoError}`
                 : ' · esperando sincronización'}
           </Text>
-          {operacion.estado === 'conflicto' && usuario?.uid && (
+          {['conflicto', 'rechazada'].includes(operacion.estado) && usuario?.uid && (
             <Pressable
               accessibilityRole="button"
               onPress={() => Alert.alert(
-                'Descartar operación en conflicto',
-                'Esto eliminará de este dispositivo la solicitud local no confirmada. Firestore no se modificará.',
+                operacion.estado === 'conflicto'
+                  ? 'Descartar operación en conflicto'
+                  : 'Descartar operación rechazada',
+                'Esto eliminará de este dispositivo la solicitud local no confirmada. El servidor no se modificará.',
                 [
                   { text: 'Conservar', style: 'cancel' },
                   {
@@ -66,7 +72,7 @@ export default function AvisoOffline({ desdeCache = false, actualizadoEn = null,
                     style: 'destructive',
                     onPress: async () => {
                       try {
-                        await descartarConflictoOffline(usuario.uid, operacion.id);
+                        await descartarOperacionOffline(usuario.uid, operacion.id);
                         await actualizarCola();
                       } catch (error) {
                         console.error('No se pudo descartar la operación local:', error);
@@ -83,7 +89,9 @@ export default function AvisoOffline({ desdeCache = false, actualizadoEn = null,
           )}
         </View>
       ))}
-      {puedeContactarFirestore && cola.length > 0 && (
+      {puedeContactarApi && cola.some((operacion) => (
+        operacion.estado === 'pendiente' || operacion.estado === 'conflicto'
+      )) && (
         <Pressable
           accessibilityRole="button"
           disabled={sincronizando}

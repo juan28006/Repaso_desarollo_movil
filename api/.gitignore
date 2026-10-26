@@ -1,0 +1,9 @@
+node_modules/
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+
+# Credenciales privadas de Firebase Admin
+serviceAccount*.json

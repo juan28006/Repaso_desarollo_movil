@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { ESTADOS_RESERVA } from '../constantes/estadosReserva';
+import { ESTADOS_RESERVA, obtenerEstadoReserva } from '../constantes/estadosReserva';
 
 export default function EstadoBadge({ estado, reserva }) {
-  const config = ESTADOS_RESERVA[estado || reserva?.estado] || ESTADOS_RESERVA.reservado;
+  const config = ESTADOS_RESERVA[estado || (reserva && obtenerEstadoReserva(reserva))] || ESTADOS_RESERVA.reservado;
 
   return (
     <View style={[styles.badge, { backgroundColor: config.color }]}>

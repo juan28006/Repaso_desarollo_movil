@@ -7,6 +7,7 @@ import {
   ScrollView,
   Pressable,
   Alert,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthContexto } from '../contextos/AuthContexto';
@@ -17,6 +18,7 @@ import {
   verificarDisponibilidadCasillero,
 } from '../services/zonasService';
 import { ejecutarOEncolar } from '../services/offlineQueueService';
+import { esPersonal } from '../constantes/roles';
 
 const franjasDisponibles = ['Mañana', 'Tarde', 'Noche'];
 
@@ -29,8 +31,8 @@ const formatearFecha = (date) => {
 
 export default function DetalleCasilleroScreen({ route, navigation }) {
   const { zonaId, casilleroId, zonaNombre } = route.params;
-  const { usuario } = useAuthContexto();
-  const { conectado, puedeContactarFirestore, actualizarCola } = useEstadoConexion();
+  const { usuario, rol } = useAuthContexto();
+  const { conectado, puedeContactarApi, actualizarCola } = useEstadoConexion();
   const [casillero, setCasillero] = useState(null);
   const [cacheInfo, setCacheInfo] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -39,6 +41,8 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
   const [mostrarListaFechas, setMostrarListaFechas] = useState(false);
   const [franjaSeleccionada, setFranjaSeleccionada] = useState('Mañana');
   const [guardando, setGuardando] = useState(false);
+  // Solo gestor/administrador: reservar en nombre de un estudiante.
+  const [correoEstudiante, setCorreoEstudiante] = useState('');
   const [disponibilidad, setDisponibilidad] = useState({ disponible: null, cargando: false });
 
   const opcionesFechas = React.useMemo(() => {
@@ -63,7 +67,7 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
   }, []);
 
   const consultarDisponibilidad = useCallback(async (fechaSeleccionada, franjaSeleccionadaActual) => {
-    if (!fechaSeleccionada || !franjaSeleccionadaActual || !puedeContactarFirestore) {
+    if (!fechaSeleccionada || !franjaSeleccionadaActual || !puedeContactarApi) {
       setDisponibilidad({ disponible: null, cargando: false });
       return;
     }
@@ -78,10 +82,10 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
 
       setDisponibilidad({ disponible, cargando: false });
     } catch (error) {
-      console.error('No se pudo validar la disponibilidad en Firestore:', error);
+      console.error('No se pudo validar la disponibilidad en el servidor:', error);
       setDisponibilidad({ disponible: null, cargando: false });
     }
-  }, [casilleroId, puedeContactarFirestore]);
+  }, [casilleroId, puedeContactarApi]);
 
   const cargarCasillero = useCallback(async () => {
     try {
@@ -137,7 +141,7 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
         zonaId,
         casilleroId,
         usuarioId: usuario.uid,
-        usuarioEmail: usuario.email,
+        usuarioEmail: (esPersonal(rol) && correoEstudiante.trim()) || usuario.email,
         fecha: fecha.trim(),
         franja: franjaSeleccionada,
         zonaNombre,
@@ -147,7 +151,7 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
         usuario.uid,
         'reservar',
         payloadReserva,
-        puedeContactarFirestore
+        puedeContactarApi
       );
       try {
         await actualizarCola();
@@ -158,7 +162,7 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
       if (respuesta.pendiente) {
         Alert.alert(
           'Reserva pendiente de validación',
-          'La solicitud se guardó en este dispositivo. No está confirmada y se comprobará con Firestore cuando vuelva la conexión.',
+          'La solicitud se guardó en este dispositivo. No está confirmada y se comprobará con el servidor cuando vuelva la conexión.',
           [{ text: 'Aceptar', onPress: () => navigation.goBack() }]
         );
         return;
@@ -295,6 +299,18 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
         <View style={styles.seccion}>
           <Text style={styles.etiqueta}>Reservar casillero</Text>
 
+          {esPersonal(rol) && (
+            <TextInput
+              style={styles.input}
+              placeholder="Correo del estudiante (vacío = reservar para ti)"
+              value={correoEstudiante}
+              onChangeText={setCorreoEstudiante}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+            />
+          )}
+
           <Pressable
             style={styles.input}
             onPress={() => setMostrarListaFechas((valorActual) => !valorActual)}
@@ -356,10 +372,10 @@ export default function DetalleCasilleroScreen({ route, navigation }) {
           <Pressable
             style={[
               styles.primaryButton,
-              Boolean(guardando || (puedeContactarFirestore && fecha && disponibilidad.disponible === false)) && styles.primaryButtonDisabled,
+              Boolean(guardando || (puedeContactarApi && fecha && disponibilidad.disponible === false)) && styles.primaryButtonDisabled,
             ]}
             onPress={manejarReserva}
-            disabled={Boolean(guardando || (puedeContactarFirestore && fecha && disponibilidad.disponible === false))}
+            disabled={Boolean(guardando || (puedeContactarApi && fecha && disponibilidad.disponible === false))}
           >
             <Text style={styles.primaryButtonText}>
               {guardando ? 'Guardando reserva...' : 'Reservar casillero'}
