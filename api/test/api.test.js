@@ -7,11 +7,17 @@ import { crearRepoMemoria, datosDeEjemplo } from '../src/repos/memoria.js';
 
 // Lunes 2026-10-26 10:00 hora Colombia (UTC-5): la franja Mañana está en curso.
 let ahora = new Date('2026-10-26T15:00:00Z');
-const config = cargarConfig({ ADMIN_EMAILS: 'admin@uni.edu', JWT_SECRET: 'prueba' });
+const config = cargarConfig({
+  ADMIN_EMAILS: 'admin@uni.edu',
+  JWT_SECRET: 'prueba',
+  MODO_DATOS: 'memoria',
+  NODE_ENV: 'test',
+});
 
 let servidor;
 let base;
 const tokens = {};
+const refreshTokens = {};
 const uids = {};
 
 const api = async (metodo, ruta, { token, cuerpo } = {}) => {
@@ -39,6 +45,7 @@ const registrar = async (nombre, correo) => {
   });
   assert.equal(status, 201);
   tokens[nombre] = datos.idToken;
+  refreshTokens[nombre] = datos.refreshToken;
   uids[nombre] = datos.usuario.uid;
   return datos;
 };
@@ -63,6 +70,21 @@ before(async () => {
 after(() => servidor.close());
 
 describe('autenticación y roles', () => {
+  it('rechaza registros con campos inválidos', async () => {
+    const invalido = await api('POST', '/auth/registro', {
+      cuerpo: {
+        nombreCompleto: 'Usuario de prueba',
+        cedula: '123',
+        telefono: '3001234567',
+        correo: 'registro-invalido@uni.edu',
+        direccion: 'Calle 1',
+        contrasena: 'secreto1',
+      },
+    });
+    assert.equal(invalido.status, 400);
+    assert.equal(invalido.datos.error.code, 'invalid-argument');
+  });
+
   it('el registro público siempre crea estudiantes y ADMIN_EMAILS crea administrador', async () => {
     const ana = await api('GET', '/auth/me', { token: tokens.ana });
     assert.equal(ana.datos.rol, 'estudiante');
@@ -87,6 +109,23 @@ describe('autenticación y roles', () => {
     assert.equal(malo.datos.error.code, 'auth/invalid-credential');
     const bueno = await api('POST', '/auth/login', { cuerpo: { correo: 'ana@uni.edu', contrasena: 'secreto1' } });
     assert.equal(bueno.status, 200);
+  });
+
+  it('renueva sesiones y rechaza tokens de renovación inválidos o reutilizados', async () => {
+    const renovada = await api('POST', '/auth/refresh', {
+      cuerpo: { refreshToken: refreshTokens.ana },
+    });
+    assert.equal(renovada.status, 200);
+    assert.equal((await api('GET', '/auth/me', { token: renovada.datos.idToken })).status, 200);
+
+    const reutilizada = await api('POST', '/auth/refresh', {
+      cuerpo: { refreshToken: refreshTokens.ana },
+    });
+    assert.equal(reutilizada.status, 401);
+    const inexistente = await api('POST', '/auth/refresh', {
+      cuerpo: { refreshToken: 'token-invalido' },
+    });
+    assert.equal(inexistente.status, 401);
   });
 
   it('solo gestor/administrador ven todas las reservas y solo el administrador gestiona usuarios', async () => {

@@ -51,7 +51,7 @@ export default function RegistroScreen({ navigation }) {
     } catch (error) {
       setErrorGeneral(error.code === 'auth/email-already-in-use'
         ? 'Ya existe una cuenta con este correo.'
-        : 'No pudimos crear tu cuenta. Revisa tus datos e inténtalo de nuevo.');
+        : error.message || 'No pudimos crear tu cuenta. Revisa tus datos e inténtalo de nuevo.');
     } finally {
       setCargando(false);
     }

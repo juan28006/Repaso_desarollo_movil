@@ -1,6 +1,6 @@
 // Cola de operaciones hechas sin conexión (reservar, cancelar, iniciar uso).
 // Se guarda en SQLite (offlineDb) y se envía a la API cuando vuelve la conexión.
-import { esErrorDeRed } from './offlineErrors';
+import { esErrorDeRed, estadoErrorOperacion } from './offlineErrors';
 import {
   actualizarCacheUsuario,
   actualizarOperacionCola,
@@ -39,12 +39,12 @@ export async function cerrarSesionSinSincronizacionActiva(uid, cerrarSesion) {
   }
 }
 
-export async function descartarConflictoOffline(uid, operacionId) {
+export async function descartarOperacionOffline(uid, operacionId) {
   if (uidActual() !== uid) throw errorSesion('La sesión cambió; no se modificó la cola de otra cuenta.');
   const cola = await listarCola(uid);
   const operacion = cola.find((item) => item.id === operacionId);
-  if (!operacion || operacion.estado !== 'conflicto') {
-    throw new Error('Solo se pueden descartar explícitamente operaciones en conflicto.');
+  if (!operacion || !['conflicto', 'rechazada'].includes(operacion.estado)) {
+    throw new Error('Solo se pueden descartar operaciones rechazadas o en conflicto.');
   }
   await eliminarOperacionCola(uid, operacionId);
 }
@@ -61,11 +61,13 @@ export async function agregarOperacionOffline(uid, tipo, datos) {
     creadaEn: Date.now(),
   });
 
-  if (operacion.estado === 'conflicto') {
+  if (['conflicto', 'rechazada'].includes(operacion.estado)) {
     const error = new Error(
-      'Esta solicitud tiene un conflicto. Resuélvelo desde el aviso de operaciones pendientes.'
+      operacion.estado === 'conflicto'
+        ? 'Esta solicitud tiene un conflicto. Resuélvelo desde el aviso de operaciones pendientes.'
+        : 'El servidor rechazó esta solicitud. Descártala antes de crear otra.'
     );
-    error.code = 'operation-conflict';
+    error.code = operacion.estado === 'conflicto' ? 'operation-conflict' : 'operation-rejected';
     throw error;
   }
   return operacion;
@@ -128,15 +130,6 @@ async function actualizarCacheTrasConfirmacion(uid, operacion, resultado) {
   }
 }
 
-const esConflicto = (error) => (
-  error.code === 'reservation-conflict'
-  || error.code === 'operation-conflict'
-  || error.code === 'permission-denied'
-  || error.code === 'failed-precondition'
-  || error.code === 'not-found'
-  || error.code === 'invalid-argument'
-);
-
 export async function ejecutarOEncolar(uid, tipo, datos, conectado) {
   if (!conectado) {
     const operacion = await agregarOperacionOffline(uid, tipo, datos);
@@ -161,7 +154,8 @@ export async function sincronizarColaOffline(uid, { reintentarConflictos = false
   try {
     const inicial = await listarCola(uid);
     const procesables = inicial.filter((operacion) => (
-      operacion.estado !== 'conflicto' || reintentarConflictos
+      operacion.estado === 'pendiente'
+      || (operacion.estado === 'conflicto' && reintentarConflictos)
     ));
 
     for (const operacion of procesables) {
@@ -178,10 +172,10 @@ export async function sincronizarColaOffline(uid, { reintentarConflictos = false
       } catch (error) {
         console.error(`No se pudo sincronizar ${operacion.id}:`, error);
         await actualizarOperacionCola(uid, operacion.id, {
-          estado: esConflicto(error) ? 'conflicto' : 'pendiente',
+          estado: estadoErrorOperacion(error),
           ultimoError: error.message || 'Error al sincronizar con el servidor.',
         });
-        if (esErrorDeRed(error) || error.code === 'uid-mismatch') break;
+        if (esErrorDeRed(error) || error.code === 'uid-mismatch' || error.status === 401) break;
       }
     }
     return listarCola(uid);

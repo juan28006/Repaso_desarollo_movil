@@ -46,7 +46,11 @@ const enviar = async (metodo, ruta, { cuerpo, token } = {}) => {
   if (respuesta.ok) return datos;
 
   if ([502, 503, 504].includes(respuesta.status)) {
-    throw crearError('El servidor no está disponible.', 'unavailable', respuesta.status);
+    throw crearError(
+      datos?.error?.mensaje || 'El servidor no está disponible.',
+      datos?.error?.code || 'unavailable',
+      respuesta.status
+    );
   }
   throw crearError(
     datos?.error?.mensaje || 'No se pudo completar la solicitud.',

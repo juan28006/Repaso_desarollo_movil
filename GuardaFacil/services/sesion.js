@@ -40,12 +40,13 @@ export async function guardarSesion(nueva) {
 }
 
 export async function borrarSesion() {
-  sesion = null;
   try {
     await almacen.borrar();
   } catch (error) {
     console.error('No se pudo borrar la sesión guardada:', error);
+    throw new Error('No se pudo eliminar la sesión guardada. Inténtalo de nuevo.');
   }
+  sesion = null;
 }
 
 export const alExpirarSesion = (escucha) => {
@@ -54,6 +55,13 @@ export const alExpirarSesion = (escucha) => {
 };
 
 export async function expirarSesion() {
-  await borrarSesion();
+  let errorAlBorrar = null;
+  try {
+    await borrarSesion();
+  } catch (error) {
+    errorAlBorrar = error;
+    sesion = null;
+  }
   escuchasExpiracion.forEach((escucha) => escucha());
+  if (errorAlBorrar) throw errorAlBorrar;
 }

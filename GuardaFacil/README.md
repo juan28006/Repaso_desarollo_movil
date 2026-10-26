@@ -61,6 +61,7 @@ npm run android
 npm run ios
 npm run web
 npm run lint
+npm test
 ```
 
 La aplicación usa `App.js` como entrada y `NavegacionStack` muestra Home, Login y Registro cuando no hay sesión, y `Lista` cuando el usuario está autenticado. Registro, login, reservas y demás reglas de negocio se ejecutan en la API; el cliente solo guarda el token de sesión en el almacén seguro del dispositivo.
@@ -77,7 +78,7 @@ El rol lo asigna la API; las pantallas solo ocultan opciones y la API rechaza lo
 
 La aplicación usa `expo-network` para observar conectividad y **SQLite** (`expo-sqlite`, base `guardafacil.db`) en una versión reducida de dos tablas: `cache` (última respuesta de la API por UID y recurso: zonas, casilleros, reservas, y para el personal reservas globales/usuarios) y `cola` (operaciones pendientes por UID). Si la API no responde, las pantallas muestran los últimos datos guardados e indican que la disponibilidad puede estar desactualizada. La base es local a la instalación y no está cifrada; el token de sesión va aparte, en `expo-secure-store`. La app abre con la sesión guardada aunque no haya internet.
 
-Las reservas, cancelaciones (también las liberaciones de un gestor) e inicios de uso solicitados sin conexión se guardan en la cola. Una reserva en cola aparece como **Pendiente de validación**, nunca como confirmada. Cuando vuelve la conexión, la API valida cada operación con sus reglas; un conflicto o error conserva la operación en la cola. Los conflictos se pueden reintentar o descartar explícitamente desde el aviso; descartar elimina solo la solicitud local no confirmada. La cola se reintenta al recuperar conectividad, al volver la aplicación al primer plano o manualmente desde el aviso. Cambiar roles requiere conexión.
+Las reservas, cancelaciones (también las liberaciones de un gestor) e inicios de uso solicitados sin conexión se guardan en la cola. Una reserva en cola aparece como **Pendiente de validación**, nunca como confirmada. Cuando vuelve la conexión, la API valida cada operación con sus reglas. Si la acepta, se actualiza la caché y se quita de la cola; los conflictos quedan marcados como **Conflicto** y los errores definitivos del cliente como **Rechazada**, ambos disponibles para descartar explícitamente desde el aviso. Los conflictos se pueden reintentar; los rechazos deben descartarse antes de volver a enviar una solicitud corregida. La cola se reintenta al recuperar conectividad, al volver la aplicación al primer plano o manualmente desde el aviso. Cambiar roles requiere conexión.
 
 Al cerrar sesión con operaciones pendientes se puede intentar sincronizarlas, cancelar el cierre o cerrar sesión conservándolas. Las operaciones conservadas permanecen aisladas bajo la cuenta original y no se envían al iniciar sesión con otra cuenta.
 

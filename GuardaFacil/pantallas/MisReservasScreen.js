@@ -15,6 +15,7 @@ import { useAuthContexto } from '../contextos/AuthContexto';
 import { useEstadoConexion } from '../contextos/EstadoConexionContexto';
 import AvisoOffline from '../componentes/AvisoOffline';
 import { obtenerReservasUsuario } from '../services/zonasService';
+import { aplicarColaAReservas, etiquetaOperacionLocal } from '../services/estadoColaReserva';
 import { puedeCancelarReserva, puedeIniciarUso } from '../services/reglasReserva';
 import {
   ejecutarOEncolar,
@@ -86,9 +87,10 @@ export default function MisReservasScreen() {
         .map((operacion) => ({
           ...operacion.datos,
           id: `${operacion.datos.casilleroId}_${operacion.datos.fecha}_${operacion.datos.franja}`,
-          estado: operacion.estado === 'conflicto'
-            ? 'conflicto_validacion'
-            : 'pendiente_validacion',
+          estado: ({
+            conflicto: 'conflicto_validacion',
+            rechazada: 'rechazada',
+          })[operacion.estado] || 'pendiente_validacion',
           origen: 'local',
           operacionId: operacion.id,
         }));
@@ -106,10 +108,14 @@ export default function MisReservasScreen() {
           : reserva
       ));
       const idsMostrados = new Set(reservasMostradas.map((reserva) => reserva.id));
+      const reservasConCola = aplicarColaAReservas(
+        reservasMostradas,
+        operaciones.filter((operacion) => operacion.tipo !== 'reservar')
+      );
       setReservasState({
         uid: usuario.uid,
         items: [
-          ...reservasMostradas,
+          ...reservasConCola,
           ...reservasLocales.filter((reserva) => !idsMostrados.has(reserva.id)),
         ],
       });
@@ -146,7 +152,7 @@ export default function MisReservasScreen() {
 
   const reservasFiltradas = useMemo(() => {
     const esActiva = (reserva) => (
-      ['reservado', 'en_uso', 'pendiente_validacion', 'conflicto_validacion']
+      ['reservado', 'en_uso', 'pendiente_validacion', 'conflicto_validacion', 'rechazada']
         .includes(obtenerEstadoReserva(reserva))
     );
     const activas = reservas.filter(esActiva);
@@ -202,8 +208,14 @@ export default function MisReservasScreen() {
                     items: actual.items.map((item) => (
                       item.id === reserva.id && item.origen === reserva.origen
                         ? resultado.pendiente
-                          ? { ...item, cancelacionPendiente: true }
-                          : { ...item, estado: 'cancelada' }
+                          ? {
+                            ...item,
+                            cancelacionPendiente: true,
+                            estadoOperacionLocal: 'pendiente_validacion',
+                            tipoOperacionLocal: 'cancelar',
+                            errorOperacionLocal: null,
+                          }
+                          : { ...item, ...resultado.resultado, origen: item.origen }
                         : item
                     )),
                   }
@@ -258,8 +270,14 @@ export default function MisReservasScreen() {
                     items: actual.items.map((item) => (
                       item.id === reserva.id && item.origen === reserva.origen
                         ? resultado.pendiente
-                          ? { ...item, inicioUsoPendiente: true }
-                          : { ...item, estado: 'en_uso' }
+                          ? {
+                            ...item,
+                            inicioUsoPendiente: true,
+                            estadoOperacionLocal: 'pendiente_validacion',
+                            tipoOperacionLocal: 'iniciar_uso',
+                            errorOperacionLocal: null,
+                          }
+                          : { ...item, ...resultado.resultado, origen: item.origen }
                         : item
                     )),
                   }
@@ -359,9 +377,13 @@ export default function MisReservasScreen() {
             </Text>
           </View>
         ) : reservasFiltradas.map((reserva) => {
-          const esCancelable = puedeCancelarReserva(reserva);
+          const esCancelable = puedeCancelarReserva(reserva)
+            && !reserva.cancelacionPendiente
+            && !reserva.estadoOperacionLocal;
           const cancelacionEnCurso = cancelandoId === reserva.id;
-          const iniciable = puedeIniciarUso(reserva);
+          const iniciable = puedeIniciarUso(reserva)
+            && !reserva.inicioUsoPendiente
+            && !reserva.estadoOperacionLocal;
           const inicioEnCurso = iniciandoId === reserva.id;
 
           return (
@@ -385,6 +407,9 @@ export default function MisReservasScreen() {
               )}
               {reserva.inicioUsoPendiente && (
                 <Text style={styles.detallePendiente}>Inicio de uso pendiente de validación</Text>
+              )}
+              {!!etiquetaOperacionLocal(reserva) && (
+                <Text style={styles.detallePendiente}>{etiquetaOperacionLocal(reserva)}</Text>
               )}
 
               {esCancelable && (

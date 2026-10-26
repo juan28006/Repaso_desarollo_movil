@@ -46,13 +46,17 @@ cd api
 cp .env.example .env      # ajusta los valores
 npm install
 npm test                  # pruebas automáticas (modo memoria)
-node --env-file=.env src/index.js
+npm start                 # carga .env y arranca la API
 ```
 
-Con `MODO_DATOS=memoria` (por defecto) hay datos de ejemplo y nada persiste: sirve para desarrollar.
+`MODO_DATOS` es obligatorio. Con `MODO_DATOS=memoria` hay datos de ejemplo y nada persiste:
+úsalo solo para desarrollar o probar con `NODE_ENV=development` o `NODE_ENV=test`; el backend
+rechaza este modo en cualquier otro entorno.
 Con `MODO_DATOS=firebase` se usan Firestore y Firebase Auth reales; necesitas la cuenta de servicio
 del proyecto (Configuración del proyecto → Cuentas de servicio) y la *Web API key*. Las colecciones
 son las que ya usaba la app (`users`, `zonas/*/casilleros`, `reservas`, `historial_reservas`).
 Publica `firestore.rules` para impedir el acceso directo de las apps a Firestore.
 
 `UTC_OFFSET_HORAS` fija la zona horaria de las franjas (Mañana 06–12, Tarde 12–18, Noche 18–24).
+En un dispositivo físico, `EXPO_PUBLIC_API_URL` debe apuntar a la IP local del computador
+en la misma red Wi-Fi (no `localhost` ni una IP antigua).

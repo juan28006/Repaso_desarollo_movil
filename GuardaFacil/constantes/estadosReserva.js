@@ -6,24 +6,19 @@ export const ESTADOS_RESERVA = {
   cancelado: { etiqueta: 'Cancelado', color: '#e74c3c' },
   pendiente_validacion: { etiqueta: 'Pendiente de validación', color: '#b7791f' },
   conflicto_validacion: { etiqueta: 'Conflicto por resolver', color: '#a12d22' },
+  rechazada: { etiqueta: 'Rechazada por el servidor', color: '#a12d22' },
 };
 
-// La API entrega `finUso` (instante ISO). Con él el estado sigue siendo correcto sin conexión.
-export const obtenerFinReserva = (reserva) => (reserva.finUso ? new Date(reserva.finUso) : null);
-
-export const obtenerEstadoReserva = (reserva, ahora = new Date()) => {
+// Los estados de negocio vienen calculados por la API. Solo las operaciones locales
+// aún no confirmadas reciben un estado visual propio.
+export const obtenerEstadoReserva = (reserva) => {
+  if (reserva.estadoOperacionLocal) return reserva.estadoOperacionLocal;
   if (reserva.estado === 'pendiente_validacion') return 'pendiente_validacion';
   if (reserva.estado === 'conflicto_validacion') return 'conflicto_validacion';
+  if (reserva.estado === 'rechazada') return 'rechazada';
+  if (ESTADOS_RESERVA[reserva.estadoVisible]) return reserva.estadoVisible;
   if (reserva.estado === 'cancelada') return 'cancelado';
   if (reserva.estado === 'finalizada') return 'finalizado';
-
-  const fin = obtenerFinReserva(reserva);
-  if (fin === null) return 'reservado';
-
-  if (reserva.estado === 'en_uso') {
-    return ahora < fin ? 'en_uso' : 'finalizado';
-  }
-
-  // estado 'confirmada': nunca se inició el uso
-  return ahora < fin ? 'reservado' : 'vencido';
+  if (reserva.estado === 'en_uso') return 'en_uso';
+  return 'reservado';
 };

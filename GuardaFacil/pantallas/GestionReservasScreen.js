@@ -17,7 +17,8 @@ import { useEstadoConexion } from '../contextos/EstadoConexionContexto';
 import AvisoOffline from '../componentes/AvisoOffline';
 import EstadoBadge from '../componentes/estadoBadge';
 import { obtenerTodasLasReservas } from '../services/gestionService';
-import { ejecutarOEncolar } from '../services/offlineQueueService';
+import { ejecutarOEncolar, obtenerColaOffline } from '../services/offlineQueueService';
+import { aplicarColaAReservas, etiquetaOperacionLocal } from '../services/estadoColaReserva';
 import { puedeCancelarReserva } from '../services/reglasReserva';
 import { obtenerEstadoReserva } from '../constantes/estadosReserva';
 
@@ -43,8 +44,11 @@ export default function GestionReservasScreen({ navigation }) {
     if (!usuario?.uid) return;
     if (mostrarCarga) setCargando(true);
     try {
-      const resultado = await obtenerTodasLasReservas(usuario.uid);
-      setReservas(resultado.datos);
+      const [resultado, operaciones] = await Promise.all([
+        obtenerTodasLasReservas(usuario.uid),
+        obtenerColaOffline(usuario.uid),
+      ]);
+      setReservas(aplicarColaAReservas(resultado.datos, operaciones));
       setCacheInfo(resultado);
       setError('');
     } catch (err) {
@@ -111,7 +115,13 @@ export default function GestionReservasScreen({ navigation }) {
               setReservas((actuales) => actuales.map((item) => {
                 if (item.id !== reserva.id) return item;
                 return resultado.pendiente
-                  ? { ...item, cancelacionPendiente: true }
+                  ? {
+                    ...item,
+                    cancelacionPendiente: true,
+                    estadoOperacionLocal: 'pendiente_validacion',
+                    tipoOperacionLocal: 'cancelar',
+                    errorOperacionLocal: null,
+                  }
                   : { ...item, ...resultado.resultado };
               }));
               if (resultado.pendiente) {
@@ -201,7 +211,9 @@ export default function GestionReservasScreen({ navigation }) {
             <Text style={styles.vacioTitulo}>No hay reservas para mostrar</Text>
           </View>
         ) : visibles.map((reserva) => {
-          const liberable = puedeCancelarReserva(reserva) && !reserva.cancelacionPendiente;
+          const liberable = puedeCancelarReserva(reserva)
+            && !reserva.cancelacionPendiente
+            && !reserva.estadoOperacionLocal;
           return (
             <View key={reserva.id} style={styles.tarjeta}>
               <View style={styles.tarjetaEncabezado}>
@@ -211,6 +223,9 @@ export default function GestionReservasScreen({ navigation }) {
               <Text style={styles.detalle}>{reserva.zonaNombre || 'Zona'}</Text>
               <Text style={styles.detalle}>{reserva.fecha} · {reserva.franja}</Text>
               <Text style={styles.detalle}>Reservado por: {reserva.usuarioEmail}</Text>
+              {!!etiquetaOperacionLocal(reserva) && (
+                <Text style={styles.detallePendiente}>{etiquetaOperacionLocal(reserva)}</Text>
+              )}
               {reserva.cancelacionPendiente && (
                 <Text style={styles.detallePendiente}>Liberación pendiente de validación</Text>
               )}

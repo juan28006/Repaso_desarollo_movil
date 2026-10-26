@@ -6,9 +6,15 @@ import { ApiError } from '../errores.js';
 const REST = 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword';
 const REFRESH = 'https://securetoken.googleapis.com/v1/token';
 
-const traducir = (mensaje = '') => {
+export const traducirErrorFirebase = (mensaje = '') => {
   if (/EMAIL_NOT_FOUND|INVALID_PASSWORD|INVALID_LOGIN_CREDENTIALS/.test(mensaje)) {
     return new ApiError(401, 'auth/invalid-credential', 'Correo o contraseña incorrectos.');
+  }
+  if (/API_KEY_INVALID|API key not valid|PROJECT_NOT_FOUND|CONFIGURATION_NOT_FOUND/i.test(mensaje)) {
+    return new ApiError(503, 'auth/configuration-error', 'Verifica la configuración de Firebase Authentication y FIREBASE_WEB_API_KEY.');
+  }
+  if (/OPERATION_NOT_ALLOWED|EMAIL_PASSWORD_SIGN_IN_DISABLED/.test(mensaje)) {
+    return new ApiError(503, 'auth/provider-disabled', 'Habilita el proveedor Correo/contraseña en Firebase Authentication.');
   }
   if (/USER_DISABLED/.test(mensaje)) return new ApiError(403, 'permission-denied', 'La cuenta está deshabilitada.');
   if (/TOKEN_EXPIRED|INVALID_REFRESH_TOKEN|USER_NOT_FOUND/.test(mensaje)) {
@@ -21,13 +27,18 @@ export const crearAuthFirebase = ({ app, apiKey }) => {
   const auth = getAuth(app);
 
   const llamar = async (url, cuerpo, formulario = false) => {
-    const respuesta = await fetch(`${url}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': formulario ? 'application/x-www-form-urlencoded' : 'application/json' },
-      body: formulario ? new URLSearchParams(cuerpo).toString() : JSON.stringify(cuerpo),
-    });
+    let respuesta;
+    try {
+      respuesta = await fetch(`${url}?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': formulario ? 'application/x-www-form-urlencoded' : 'application/json' },
+        body: formulario ? new URLSearchParams(cuerpo).toString() : JSON.stringify(cuerpo),
+      });
+    } catch {
+      throw new ApiError(503, 'unavailable', 'No fue posible conectar con Firebase Authentication.');
+    }
     const datos = await respuesta.json().catch(() => ({}));
-    if (!respuesta.ok) throw traducir(datos?.error?.message);
+    if (!respuesta.ok) throw traducirErrorFirebase(datos?.error?.message);
     return datos;
   };
 

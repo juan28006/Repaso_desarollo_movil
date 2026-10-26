@@ -27,7 +27,7 @@ export default function LoginScreen({ navigation }) {
     } catch (errorFirebase) {
       setError(['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found'].includes(errorFirebase.code)
         ? 'El correo o la contraseña no son correctos.'
-        : 'No se pudo iniciar sesión. Inténtalo de nuevo.');
+        : errorFirebase.message || 'No se pudo iniciar sesión. Inténtalo de nuevo.');
     } finally {
       setCargando(false);
     }
