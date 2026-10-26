@@ -1,5 +1,3 @@
-import { obtenerInicioUsoReserva } from '../services/zonasService';
-
 export const ESTADOS_RESERVA = {
   reservado: { etiqueta: 'Reservado', color: '#273c9c' },
   en_uso: { etiqueta: 'En uso', color: '#e67e22' },
@@ -10,23 +8,8 @@ export const ESTADOS_RESERVA = {
   conflicto_validacion: { etiqueta: 'Conflicto por resolver', color: '#a12d22' },
 };
 
-// Hora en que termina cada franja. Si la Noche llega hasta las 6 a. m.
-// del día siguiente, cambia el 24 por 30.
-const horasFinFranjas = { Mañana: 12, Tarde: 18, Noche: 24 };
-
-export const obtenerFinReserva = (reserva) => {
-  const inicio = obtenerInicioUsoReserva(reserva);
-  const horaFin = horasFinFranjas[reserva.franja];
-
-  if (inicio === null || horaFin === undefined) return null;
-
-  return new Date(
-    inicio.getFullYear(),
-    inicio.getMonth(),
-    inicio.getDate(),
-    horaFin
-  );
-};
+// La API entrega `finUso` (instante ISO). Con él el estado sigue siendo correcto sin conexión.
+export const obtenerFinReserva = (reserva) => (reserva.finUso ? new Date(reserva.finUso) : null);
 
 export const obtenerEstadoReserva = (reserva, ahora = new Date()) => {
   if (reserva.estado === 'pendiente_validacion') return 'pendiente_validacion';

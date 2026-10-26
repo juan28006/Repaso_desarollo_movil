@@ -4,13 +4,14 @@ import { useAuthContexto } from '../contextos/AuthContexto';
 import { useEstadoConexion } from '../contextos/EstadoConexionContexto';
 import AvisoOffline from '../componentes/AvisoOffline';
 import { obtenerZonas } from '../services/zonasService';
+import { ETIQUETAS_ROL, esAdministrador, esPersonal } from '../constantes/roles';
 import {
   cerrarSesionSinSincronizacionActiva,
   obtenerColaOffline,
 } from '../services/offlineQueueService';
 
 export default function ListaScreen({ navigation }) {
-  const { usuario, cerrarSesion } = useAuthContexto();
+  const { usuario, rol, cerrarSesion } = useAuthContexto();
   const {
     conectado,
     actualizarCola,
@@ -54,7 +55,7 @@ export default function ListaScreen({ navigation }) {
         if (!cerrada) {
           Alert.alert(
             'Sincronización en curso',
-            'Espera a que termine la operación con Firestore antes de cerrar sesión.'
+            'Espera a que termine la sincronización con el servidor antes de cerrar sesión.'
           );
         }
       } catch (error) {
@@ -121,6 +122,7 @@ export default function ListaScreen({ navigation }) {
     <View style={styles.container}>
       <Text style={styles.title}>Bienvenido a GuardaFácil</Text>
       <Text style={styles.email}>{usuario?.email}</Text>
+      {rol && <Text style={styles.rol}>Rol: {ETIQUETAS_ROL[rol] || rol}</Text>}
       <AvisoOffline
         desdeCache={cacheInfo?.desdeCache}
         actualizadoEn={cacheInfo?.actualizadoEn}
@@ -133,6 +135,24 @@ export default function ListaScreen({ navigation }) {
       >
         <Text style={styles.reservasButtonText}>Mis reservas</Text>
       </Pressable>
+      {esPersonal(rol) && (
+        <Pressable
+          accessibilityRole="button"
+          style={styles.reservasButton}
+          onPress={() => navigation.navigate('GestionReservas')}
+        >
+          <Text style={styles.reservasButtonText}>Gestión de reservas</Text>
+        </Pressable>
+      )}
+      {esAdministrador(rol) && (
+        <Pressable
+          accessibilityRole="button"
+          style={styles.reservasButton}
+          onPress={() => navigation.navigate('Usuarios')}
+        >
+          <Text style={styles.reservasButtonText}>Usuarios y roles</Text>
+        </Pressable>
+      )}
       <Text style={styles.description}>
         {cacheInfo?.desdeCache || conectado === false ? 'Zonas guardadas:' : 'Zonas disponibles:'}
       </Text>
@@ -182,6 +202,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, gap: 16, padding: 24, backgroundColor: '#f5f7ff' },
   title: { fontSize: 28, fontWeight: '800', color: '#172044' },
   email: { color: '#273c9c', fontSize: 16, fontWeight: '600' },
+  rol: { color: '#69728e', fontSize: 14, marginTop: -8 },
   description: { color: '#69728e', fontSize: 16 },
   reservasButton: {
     alignItems: 'center',

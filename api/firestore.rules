@@ -1,0 +1,10 @@
+// Con la API, el cliente ya no habla con Firestore: solo firebase-admin (que ignora las
+// reglas) accede a los datos. Esto cierra todo acceso directo desde las apps.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

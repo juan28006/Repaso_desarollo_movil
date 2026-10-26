@@ -14,7 +14,7 @@ export default function AvisoOffline({ desdeCache = false, actualizadoEn = null,
   const { usuario } = useAuthContexto();
   const {
     conectado,
-    puedeContactarFirestore,
+    puedeContactarApi,
     cola,
     sincronizando,
     reintentarSincronizacion,
@@ -58,7 +58,7 @@ export default function AvisoOffline({ desdeCache = false, actualizadoEn = null,
               accessibilityRole="button"
               onPress={() => Alert.alert(
                 'Descartar operación en conflicto',
-                'Esto eliminará de este dispositivo la solicitud local no confirmada. Firestore no se modificará.',
+                'Esto eliminará de este dispositivo la solicitud local no confirmada. El servidor no se modificará.',
                 [
                   { text: 'Conservar', style: 'cancel' },
                   {
@@ -83,7 +83,7 @@ export default function AvisoOffline({ desdeCache = false, actualizadoEn = null,
           )}
         </View>
       ))}
-      {puedeContactarFirestore && cola.length > 0 && (
+      {puedeContactarApi && cola.length > 0 && (
         <Pressable
           accessibilityRole="button"
           disabled={sincronizando}

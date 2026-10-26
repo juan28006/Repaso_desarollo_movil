@@ -9,12 +9,15 @@ import ListaScreen from '../pantallas/ListaScreen';
 import CasillerosScreen from '../pantallas/CasillerosScreen';
 import DetalleCasilleroScreen from '../pantallas/DetalleCasilleroScreen';
 import MisReservasScreen from '../pantallas/MisReservasScreen';
+import GestionReservasScreen from '../pantallas/GestionReservasScreen';
+import UsuariosScreen from '../pantallas/UsuariosScreen';
+import { esAdministrador, esPersonal } from '../constantes/roles';
 import IndicadorConexion from '../componentes/IndicadorConexion';
 
 const Stack = createNativeStackNavigator();
 
 export default function NavegacionStack() {
-  const { usuario, cargando } = useAuthContexto();
+  const { usuario, rol, cargando } = useAuthContexto();
 
   if (cargando) {
     return <View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator size="large" /></View>;
@@ -30,6 +33,12 @@ export default function NavegacionStack() {
           <Stack.Screen name="MisReservas" component={MisReservasScreen} options={{ title: 'Mis reservas' }} />
           <Stack.Screen name="Casilleros" component={CasillerosScreen} options={{ title: 'Casilleros' }} />
           <Stack.Screen name="DetalleCasillero" component={DetalleCasilleroScreen} options={{ title: 'Detalle del casillero' }} />
+          {esPersonal(rol) && (
+            <Stack.Screen name="GestionReservas" component={GestionReservasScreen} options={{ title: 'Gestión de reservas' }} />
+          )}
+          {esAdministrador(rol) && (
+            <Stack.Screen name="Usuarios" component={UsuariosScreen} options={{ title: 'Usuarios y roles' }} />
+          )}
         </>
       ) : (
         <Stack.Group>

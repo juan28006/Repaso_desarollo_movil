@@ -14,11 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthContexto } from '../contextos/AuthContexto';
 import { useEstadoConexion } from '../contextos/EstadoConexionContexto';
 import AvisoOffline from '../componentes/AvisoOffline';
-import {
-  obtenerReservasUsuario,
-  puedeCancelarReserva,
-} from '../services/zonasService';
-import { puedeIniciarUso } from '../services/usoReservaService';
+import { obtenerReservasUsuario } from '../services/zonasService';
+import { puedeCancelarReserva, puedeIniciarUso } from '../services/reglasReserva';
 import {
   ejecutarOEncolar,
   obtenerColaOffline,
@@ -44,7 +41,7 @@ const formatearFecha = (fecha) => {
 export default function MisReservasScreen() {
   const { usuario } = useAuthContexto();
   const {
-    puedeContactarFirestore,
+    puedeContactarApi,
     cola,
     actualizarCola,
   } = useEstadoConexion();
@@ -83,6 +80,9 @@ export default function MisReservasScreen() {
       ]);
       const reservasLocales = operaciones
         .filter((operacion) => operacion.tipo === 'reservar')
+        // Las reservas que un gestor hace para un estudiante no son suyas.
+        .filter((operacion) => !operacion.datos.usuarioEmail
+          || operacion.datos.usuarioEmail.toLowerCase() === String(usuario.email).toLowerCase())
         .map((operacion) => ({
           ...operacion.datos,
           id: `${operacion.datos.casilleroId}_${operacion.datos.fecha}_${operacion.datos.franja}`,
@@ -139,10 +139,10 @@ export default function MisReservasScreen() {
   }, [cargarReservas]));
 
   useEffect(() => {
-    if (!enfocada || !puedeContactarFirestore) return undefined;
+    if (!enfocada || !puedeContactarApi) return undefined;
     const temporizador = setTimeout(() => cargarReservas(false), 0);
     return () => clearTimeout(temporizador);
-  }, [enfocada, puedeContactarFirestore, cola, cargarReservas]);
+  }, [enfocada, puedeContactarApi, cola, cargarReservas]);
 
   const reservasFiltradas = useMemo(() => {
     const esActiva = (reserva) => (
@@ -188,7 +188,7 @@ export default function MisReservasScreen() {
                 usuario.uid,
                 'cancelar',
                 { reservaId: reserva.id },
-                puedeContactarFirestore
+                puedeContactarApi
               );
               try {
                 await actualizarCola();
@@ -212,7 +212,7 @@ export default function MisReservasScreen() {
               Alert.alert(
                 resultado.pendiente ? 'Cancelación pendiente de validación' : 'Reserva cancelada',
                 resultado.pendiente
-                  ? 'La solicitud se guardó en este dispositivo y se validará con Firestore al recuperar la conexión.'
+                  ? 'La solicitud se guardó en este dispositivo y se validará con el servidor al recuperar la conexión.'
                   : 'La reserva se agregó a tu historial.'
               );
             } catch (err) {
@@ -244,7 +244,7 @@ export default function MisReservasScreen() {
                 usuario.uid,
                 'iniciar_uso',
                 { reservaId: reserva.id },
-                puedeContactarFirestore
+                puedeContactarApi
               );
               try {
                 await actualizarCola();
@@ -268,7 +268,7 @@ export default function MisReservasScreen() {
               if (resultado.pendiente) {
                 Alert.alert(
                   'Inicio de uso pendiente de validación',
-                  'La solicitud se guardó en este dispositivo y se validará con Firestore al recuperar la conexión.'
+                  'La solicitud se guardó en este dispositivo y se validará con el servidor al recuperar la conexión.'
                 );
               }
             } catch (err) {

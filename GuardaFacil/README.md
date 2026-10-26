@@ -11,13 +11,17 @@ GuardaFacil/
 │   ├── RegistroScreen.js            # Creación de cuenta y perfil
 │   ├── validacionesAuth.js          # Validaciones de Login y Registro
 │   ├── ListaScreen.js               # Pantalla home protegida
-│   └── MisReservasScreen.js         # Reservas activas e historial del usuario
+│   ├── MisReservasScreen.js         # Reservas activas e historial del usuario
+│   ├── GestionReservasScreen.js     # Gestor/administrador: ver y liberar reservas
+│   └── UsuariosScreen.js            # Administrador: cambiar roles
 ├── services/
-│   └── zonasService.js              # Consultas de zonas, casilleros y reservas
-│   └── offlineStorage.js            # Caché local separada por UID
+│   ├── apiClient.js                 # Único acceso al servidor (token, renovación, errores)
+│   ├── sesion.js                    # Sesión guardada en almacén seguro
+│   ├── zonasService.js              # Zonas, casilleros y reservas vía API (+ caché)
+│   ├── gestionService.js            # Reservas globales y usuarios (gestor/admin)
+│   ├── offlineDb.js                 # SQLite: caché y cola offline
 │   └── offlineQueueService.js       # Cola persistente de operaciones
-├── firebase/
-│   └── firebaseConfig.js            # Inicialización de Firebase Auth y Firestore
+├── constantes/roles.js              # estudiante / gestor / administrador
 ├── App.js                           # Punto de entrada
 ├── app.json                         # Configuración de Expo
 ├── package.json                     # Dependencias y scripts
@@ -29,7 +33,7 @@ GuardaFacil/
 ## Requisitos
 
 - Node.js LTS y npm.
-- Una cuenta de Firebase con Authentication habilitado.
+- La API de GuardaFácil en ejecución (carpeta `../api`, ver su README).
 - Expo Go, un emulador Android o un simulador iOS.
 
 ## Instalación
@@ -40,19 +44,14 @@ Desde `GuardaFacil` instala las dependencias:
 npm install
 ```
 
-Configura un archivo `.env` en la raíz con las credenciales de Firebase:
+Configura un archivo `.env` en la raíz con la URL de la API (ver `.env.example`):
 
 ```env
-EXPO_PUBLIC_FIREBASE_API_KEY=tu-api-key
-EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=tu-proyecto.firebaseapp.com
-EXPO_PUBLIC_FIREBASE_PROJECT_ID=tu-proyecto
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=tu-proyecto.firebasestorage.app
-EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=tu-messaging-sender-id
-EXPO_PUBLIC_FIREBASE_APP_ID=tu-app-id
-EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=tu-measurement-id
+EXPO_PUBLIC_API_URL=http://192.168.1.10:3000
 ```
 
-El archivo `.env` está excluido del repositorio. No publiques credenciales reales.
+En un celular físico usa la IP de tu computador en la red local, no `localhost`. El cliente ya no
+incluye Firebase: la API es la única que accede a Firestore y a Firebase Auth.
 
 ## Ejecutar
 
@@ -64,15 +63,21 @@ npm run web
 npm run lint
 ```
 
-La aplicación usa `App.js` como entrada, `NavigationContainer` como contenedor raíz y `NavegacionStack` para mostrar Home, Login y Registro cuando no hay sesión, y `Lista` cuando el usuario está autenticado. Los datos adicionales del registro se guardan en `users/{uid}` de Cloud Firestore; las contraseñas solo son gestionadas por Firebase Authentication.
+La aplicación usa `App.js` como entrada y `NavegacionStack` muestra Home, Login y Registro cuando no hay sesión, y `Lista` cuando el usuario está autenticado. Registro, login, reservas y demás reglas de negocio se ejecutan en la API; el cliente solo guarda el token de sesión en el almacén seguro del dispositivo.
 
-Desde `Lista`, el usuario autenticado puede abrir **Mis reservas** para consultar sus reservas activas y el historial. Las reservas se pueden cancelar hasta el inicio de su franja (Mañana 06:00, Tarde 12:00 y Noche 18:00, hora local del dispositivo); la cancelación requiere confirmación y se conserva para el historial en Firestore.
+## Roles
+
+- **Estudiante:** reserva un casillero libre (zona → casillero → fecha y franja), consulta **Mis reservas**, cancela las suyas hasta el inicio de la franja e inicia el uso durante ella.
+- **Gestor:** además de lo anterior, ve **Gestión de reservas**, cancela cualquier reserva vigente para liberar el casillero y puede reservar a nombre de un estudiante escribiendo su correo en el detalle del casillero.
+- **Administrador:** todo lo del gestor más **Usuarios y roles** para promover o cambiar roles.
+
+El rol lo asigna la API; las pantallas solo ocultan opciones y la API rechaza lo que no corresponde.
 
 ## Modo sin conexión
 
-La aplicación usa `expo-network` para observar conectividad e `AsyncStorage` para guardar una caché de zonas, casilleros por zona y reservas/historial. Cada clave local está separada por UID. La caché conserva su fecha de actualización; si Firestore no responde, las pantallas muestran los últimos datos guardados e indican que la disponibilidad puede estar desactualizada. Esta caché es local a la instalación y no está cifrada por AsyncStorage.
+La aplicación usa `expo-network` para observar conectividad y **SQLite** (`expo-sqlite`, base `guardafacil.db`) en una versión reducida de dos tablas: `cache` (última respuesta de la API por UID y recurso: zonas, casilleros, reservas, y para el personal reservas globales/usuarios) y `cola` (operaciones pendientes por UID). Si la API no responde, las pantallas muestran los últimos datos guardados e indican que la disponibilidad puede estar desactualizada. La base es local a la instalación y no está cifrada; el token de sesión va aparte, en `expo-secure-store`. La app abre con la sesión guardada aunque no haya internet.
 
-Las reservas, cancelaciones e inicios de uso solicitados sin conexión se guardan en una cola local vinculada al UID. Una reserva en cola aparece como **Pendiente de validación**, nunca como confirmada. Cuando vuelve la conexión, Firestore valida cada operación mediante las transacciones existentes; un conflicto o error conserva la operación en la cola. Los conflictos se pueden reintentar o descartar explícitamente desde el aviso; descartar elimina solo la solicitud local no confirmada, no modifica Firestore. La cola se reintenta al recuperar conectividad, al volver la aplicación al primer plano o manualmente desde el aviso. Los errores de disponibilidad no se interpretan como confirmación ni como disponibilidad.
+Las reservas, cancelaciones (también las liberaciones de un gestor) e inicios de uso solicitados sin conexión se guardan en la cola. Una reserva en cola aparece como **Pendiente de validación**, nunca como confirmada. Cuando vuelve la conexión, la API valida cada operación con sus reglas; un conflicto o error conserva la operación en la cola. Los conflictos se pueden reintentar o descartar explícitamente desde el aviso; descartar elimina solo la solicitud local no confirmada. La cola se reintenta al recuperar conectividad, al volver la aplicación al primer plano o manualmente desde el aviso. Cambiar roles requiere conexión.
 
 Al cerrar sesión con operaciones pendientes se puede intentar sincronizarlas, cancelar el cierre o cerrar sesión conservándolas. Las operaciones conservadas permanecen aisladas bajo la cuenta original y no se envían al iniciar sesión con otra cuenta.
 
@@ -84,6 +89,6 @@ Usa una cuenta de prueba y datos no productivos. En el dispositivo o emulador pu
 2. **Pérdida de internet:** desactiva la red sin cerrar la aplicación. Comprueba **Sin conexión**, el aviso de disponibilidad desactualizada y que los listados previamente cargados sigan visibles.
 3. **Reinicio offline:** mantén la red desactivada, cierra la aplicación por completo y vuelve a abrirla con la misma cuenta. Comprueba que aparezcan los listados guardados y el aviso offline.
 4. **Operación pendiente:** sin red, solicita una reserva. Debe aparecer en Mis reservas como **Pendiente de validación** y en la cola; no debe mostrarse como confirmada. También se pueden encolar una cancelación o inicio de uso de una reserva existente.
-5. **Recuperación:** vuelve a conectar el dispositivo. Comprueba que la cola se procese y que la operación solo desaparezca después de la confirmación de Firestore. Una reserva ocupada debe quedar identificada como conflicto.
-6. **Error de sincronización:** en un proyecto Firebase de prueba, configura temporalmente una regla que deniegue la operación encolada y vuelve a conectar. Comprueba que siga en cola con error/conflicto; restaura la regla y usa **Reintentar sincronización**.
+5. **Recuperación:** vuelve a conectar el dispositivo. Comprueba que la cola se procese y que la operación solo desaparezca después de la confirmación de la API. Una reserva ocupada debe quedar identificada como conflicto.
+6. **Error de sincronización:** reserva sin conexión un casillero que otra cuenta reserve mientras tanto (o detén la API) y vuelve a conectar. Comprueba que siga en cola con error/conflicto; reanuda la API y usa **Reintentar sincronización**.
 7. **Cambio de usuario:** encola una operación offline con la cuenta A y cierra sesión conservándola. Inicia sesión con la cuenta B: la cola y los datos de A no deben mostrarse ni enviarse. Al volver a A, su operación debe seguir disponible para reintento.
