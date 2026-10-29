@@ -1,0 +1,605 @@
+
+/* ========================================
+   GUARDÁFACIL — ESTILOS PRINCIPALES
+   ======================================== */
+
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --primary-light: #eff6ff;
+  --text-primary: #172033;
+  --text-secondary: #64748b;
+  --border-color: #e8edf4;
+  --background: #f6f8fc;
+  --white: #ffffff;
+  --sidebar-width: 260px;
+  --radius: 12px;
+}
+
+/* Reinicio básico */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: var(--text-primary);
+  background: var(--background);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* ========================================
+   ESTRUCTURA GENERAL
+   ======================================== */
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  background: var(--background);
+}
+
+.main-column {
+  min-width: 0;
+  min-height: 100vh;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-left: var(--sidebar-width);
+}
+
+/* ========================================
+   BARRA LATERAL
+   ======================================== */
+
+.sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 100;
+  width: var(--sidebar-width);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 25px 18px 18px;
+  background: var(--white);
+  border-right: 1px solid var(--border-color);
+  transition: transform 0.25s ease;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 7px 29px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.brand-icon {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--white);
+  background: var(--primary);
+  border-radius: 13px;
+  box-shadow: 0 5px 12px rgb(37 99 235 / 18%);
+}
+
+.sidebar-brand h2 {
+  margin: 0 0 4px;
+  color: var(--text-primary);
+  font-size: 19px;
+  font-weight: 750;
+  letter-spacing: -0.6px;
+}
+
+.sidebar-brand span {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.mobile-close {
+  display: none;
+  margin-left: auto;
+  padding: 7px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+}
+
+/* Título del menú */
+
+.sidebar-section-label {
+  margin: 27px 0 13px 10px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 1.2px;
+}
+
+/* ========================================
+   NAVEGACIÓN
+   ======================================== */
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-height: 47px;
+  padding: 0 13px;
+  color: #64748b;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 550;
+  border-radius: 10px;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.nav-item svg {
+  flex-shrink: 0;
+  color: #94a3b8;
+  transition: color 0.2s ease;
+}
+
+.nav-item:hover {
+  color: var(--primary);
+  background: #f5f8ff;
+  transform: translateX(2px);
+}
+
+.nav-item:hover svg {
+  color: var(--primary);
+}
+
+.nav-item-active {
+  color: var(--primary-dark);
+  background: var(--primary-light);
+  font-weight: 700;
+}
+
+.nav-item-active svg {
+  color: var(--primary);
+}
+
+.nav-item-active::before {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 3px;
+  content: "";
+  background: var(--primary);
+  border-radius: 0 4px 4px 0;
+}
+
+/* ========================================
+   PARTE INFERIOR DEL SIDEBAR
+   ======================================== */
+
+.sidebar-bottom {
+  margin-top: auto;
+  padding-top: 20px;
+}
+
+.sidebar-help {
+  padding: 17px 15px;
+  background: linear-gradient(135deg, #f0f6ff, #f8faff);
+  border: 1px solid #e4edff;
+  border-radius: 12px;
+}
+
+.help-icon {
+  width: 35px;
+  height: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  color: var(--primary);
+  background: var(--white);
+  border: 1px solid #e2eaff;
+  border-radius: 10px;
+}
+
+.sidebar-help strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #24334d;
+  font-size: 12px;
+}
+
+.sidebar-help p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* Botón de cerrar sesión */
+
+.logout-button {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 0 13px;
+  color: #64748b;
+  background: var(--white);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.logout-button svg {
+  color: #94a3b8;
+}
+
+.logout-button:hover {
+  color: #dc2626;
+  background: #fff5f5;
+  border-color: #fecaca;
+}
+
+.logout-button:hover svg {
+  color: #dc2626;
+}
+
+/* ========================================
+   BARRA SUPERIOR
+   ======================================== */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0 35px;
+  background: rgb(255 255 255 / 95%);
+  border-bottom: 1px solid var(--border-color);
+  backdrop-filter: blur(12px);
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.breadcrumb-divider {
+  color: #cbd5e1;
+}
+
+.breadcrumb strong {
+  color: #334155;
+  font-weight: 650;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+/* Notificaciones */
+
+.notification-button {
+  position: relative;
+  width: 39px;
+  height: 39px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  background: var(--white);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.notification-button:hover {
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.notification-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  background: #ef4444;
+  border: 1.5px solid var(--white);
+  border-radius: 50%;
+}
+
+/* Perfil del usuario */
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding-left: 19px;
+  border-left: 1px solid var(--border-color);
+}
+
+.avatar {
+  width: 39px;
+  height: 39px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-dark);
+  background: #eaf1ff;
+  border: 1px solid #dbe7ff;
+  border-radius: 50%;
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.user-profile > div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.user-profile > div:last-child span:first-child {
+  max-width: 180px;
+  overflow: hidden;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-profile > div:last-child span:last-child {
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
+/* Botón del menú móvil */
+
+.mobile-menu {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: #475569;
+  background: var(--white);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+/* ========================================
+   CONTENIDO Y PIE DE PÁGINA
+   ======================================== */
+
+.main-content {
+  width: 100%;
+  flex: 1;
+  padding: 32px 35px;
+}
+
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 19px 35px;
+  color: #94a3b8;
+  background: var(--white);
+  border-top: 1px solid var(--border-color);
+  font-size: 11px;
+}
+
+/* ========================================
+   FONDO DEL MENÚ MÓVIL
+   ======================================== */
+
+.sidebar-overlay {
+  display: none;
+}
+
+/* ========================================
+   TABLET
+   ======================================== */
+
+@media (max-width: 1100px) {
+  .topbar {
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+
+  .main-content {
+    padding: 27px 24px;
+  }
+
+  .app-footer {
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+
+  .topbar-actions {
+    gap: 14px;
+  }
+}
+
+/* ========================================
+   MÓVIL
+   ======================================== */
+
+@media (max-width: 768px) {
+  .main-column {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .sidebar {
+    width: min(290px, 85vw);
+    transform: translateX(-100%);
+    box-shadow: none;
+  }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+    box-shadow: 12px 0 40px rgb(15 23 42 / 12%);
+  }
+
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    background: rgb(15 23 42 / 42%);
+    border: 0;
+    backdrop-filter: blur(2px);
+  }
+
+  .mobile-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .topbar {
+    min-height: 68px;
+    justify-content: flex-start;
+    gap: 13px;
+    padding: 0 18px;
+  }
+
+  .mobile-menu {
+    display: flex;
+    flex-shrink: 0;
+  }
+
+  .breadcrumb {
+    min-width: 0;
+    gap: 7px;
+    font-size: 11px;
+  }
+
+  .breadcrumb strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .topbar-actions {
+    gap: 10px;
+    margin-left: auto;
+  }
+
+  .notification-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .user-profile {
+    gap: 0;
+    padding-left: 10px;
+  }
+
+  .user-profile > div:last-child {
+    display: none;
+  }
+
+  .avatar {
+    width: 35px;
+    height: 35px;
+  }
+
+  .main-content {
+    padding: 22px 17px;
+  }
+
+  .app-footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+    padding: 17px;
+  }
+}
+
+/* ========================================
+   MÓVILES PEQUEÑOS
+   ======================================== */
+
+@media (max-width: 380px) {
+  .topbar {
+    gap: 8px;
+    padding: 0 10px;
+  }
+
+  .breadcrumb {
+    font-size: 10px;
+  }
+
+  .topbar-actions {
+    gap: 7px;
+  }
+
+  .user-profile {
+    padding-left: 7px;
+  }
+
+  .main-content {
+    padding: 18px 12px;
+  }
+}

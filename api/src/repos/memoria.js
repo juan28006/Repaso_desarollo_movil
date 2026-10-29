@@ -53,6 +53,8 @@ export const crearRepoMemoria = ({ zonas = [], casilleros = {} } = {}) => {
         guardarReserva: async (id, datos) => { reservas.set(id, clonar(datos)); },
         actualizarReserva: async (id, cambios) => {
           reservas.set(id, { ...reservas.get(id), ...clonar(cambios) });
+        },async eliminarUsuario(uid) {
+          usuarios.delete(uid);
         },
         archivarReserva: async (datos) => {
           contadorHistorial += 1;

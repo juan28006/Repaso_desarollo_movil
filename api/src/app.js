@@ -132,6 +132,34 @@ export const crearApp = ({ repo, auth, config, reloj }) => {
     res.json(await servicios.cambiarRol(req.actor, req.params.uid, req.body?.rol))
   )));
 
+  app.patch(
+  '/usuarios/:uid',
+  ...protegida(ROLES.ADMINISTRADOR),
+  ruta(async (req, res) => (
+    res.json(
+      await servicios.actualizarUsuario(
+        req.actor,
+        req.params.uid,
+        req.body || {}
+      )
+    )
+  ))
+);
+
+  app.delete(
+    '/usuarios/:uid',
+    ...protegida(ROLES.ADMINISTRADOR),
+    ruta(async (req, res) => (
+      res.json(
+        await servicios.eliminarUsuario(
+          req.actor,
+          req.params.uid,
+          auth
+        )
+      )
+    ))
+  );
+
   app.use((_req, _res, next) => next(new ApiError(404, 'not-found', 'Ruta no encontrada.')));
   // eslint-disable-next-line no-unused-vars
   app.use((error, _req, res, _next) => {

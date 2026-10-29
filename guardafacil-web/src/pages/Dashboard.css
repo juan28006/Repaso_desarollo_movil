@@ -1,0 +1,735 @@
+
+.dashboard {
+  display: grid;
+  gap: 26px;
+}
+
+.dashboard-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--color-primary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+}
+
+.eyebrow-dot,
+.locker-total-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2563eb;
+}
+
+.dashboard-heading h1 {
+  margin: 0 0 10px;
+  font-size: clamp(25px, 3vw, 32px);
+  letter-spacing: -1.2px;
+}
+
+.dashboard-heading p,
+.section-heading p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.dashboard-date,
+.locker-total {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: white;
+  color: #475569;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 17px;
+}
+
+.stat-card {
+  min-width: 0;
+  padding: 21px;
+  border: 1px solid var(--color-border);
+  border-radius: 15px;
+  background: white;
+  box-shadow: var(--shadow-card);
+}
+
+.stat-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.stat-icon {
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  border-radius: 12px;
+}
+
+.stat-icon.blue {
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.stat-icon.green {
+  color: #059669;
+  background: #d1fae5;
+}
+
+.stat-icon.red {
+  color: #dc2626;
+  background: #fee2e2;
+}
+
+.stat-icon.orange {
+  color: #d97706;
+  background: #fef3c7;
+}
+
+.stat-indicator {
+  color: #94a3b8;
+}
+
+.stat-card > p {
+  margin: 0 0 7px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.stat-value {
+  color: var(--color-text);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.stat-caption {
+  display: block;
+  margin-top: 9px;
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.locker-section {
+  padding: 25px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: white;
+  box-shadow: var(--shadow-card);
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 23px;
+}
+
+.section-heading h2 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  letter-spacing: -0.4px;
+}
+
+.locker-total {
+  color: #047857;
+  background: #f0fdf4;
+  border-color: #dcfce7;
+}
+
+.locker-total-dot {
+  background: #10b981;
+}
+
+.locker-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.locker-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-button {
+  padding: 9px 12px;
+  color: #64748b;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.filter-button:hover {
+  background: #f8fafc;
+}
+
+.filter-button.filter-active {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #dbeafe;
+}
+
+.locker-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 190px;
+  padding: 10px 12px;
+  color: #94a3b8;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+}
+
+.locker-search input {
+  width: 100%;
+  min-width: 0;
+  color: var(--color-text);
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 11px;
+}
+
+.locker-search input:focus-visible {
+  outline: none;
+}
+
+.locker-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 13px;
+}
+
+.locker-card {
+  min-width: 0;
+  padding: 13px 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: white;
+  text-align: left;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.locker-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px #0f172a0d;
+}
+
+.locker-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 15px;
+}
+
+.locker-code {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.locker-available {
+  color: #059669;
+  background: #f0fdf8;
+  border-color: #d1fae5;
+}
+
+.locker-reserved {
+  color: #dc2626;
+  background: #fff7f7;
+  border-color: #fee2e2;
+}
+
+.locker-maintenance {
+  color: #d97706;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.locker-selected {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.locker-illustration {
+  display: flex;
+  justify-content: center;
+  padding: 2px 0 12px;
+}
+
+.locker-door {
+  position: relative;
+  width: 43px;
+  height: 57px;
+  border: 2px solid currentColor;
+  border-radius: 5px;
+  opacity: 0.8;
+}
+
+.locker-door::before,
+.locker-door::after {
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  height: 2px;
+  content: '';
+  background: currentColor;
+  opacity: 0.35;
+}
+
+.locker-door::before {
+  top: 8px;
+}
+
+.locker-door::after {
+  bottom: 8px;
+}
+
+.locker-handle {
+  position: absolute;
+  top: 25px;
+  right: 5px;
+  width: 4px;
+  height: 10px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.locker-status {
+  display: block;
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.locker-empty {
+  padding: 40px 15px;
+  color: var(--color-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.locker-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 19px;
+  margin-top: 22px;
+  border-top: 1px solid #f1f5f9;
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.dashboard-message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 15px;
+  color: #047857;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.dashboard-message button {
+  margin-left: auto;
+  color: inherit;
+  border: 0;
+  background: transparent;
+  font-size: 22px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #0f172a80;
+}
+
+.locker-modal {
+  position: relative;
+  width: 100%;
+  max-width: 390px;
+  padding: 30px;
+  border-radius: 18px;
+  background: white;
+  box-shadow: 0 20px 60px #0f172a30;
+  text-align: center;
+}
+
+.modal-close {
+  position: absolute;
+  top: 13px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  color: #64748b;
+  border: 0;
+  border-radius: 8px;
+  background: #f1f5f9;
+  font-size: 23px;
+}
+
+.modal-icon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 17px;
+  border-radius: 16px;
+}
+
+.modal-icon.available {
+  color: #059669;
+  background: #d1fae5;
+}
+
+.modal-icon.reserved {
+  color: #dc2626;
+  background: #fee2e2;
+}
+
+.modal-icon.maintenance {
+  color: #d97706;
+  background: #fef3c7;
+}
+
+.locker-modal h2 {
+  margin-bottom: 12px;
+  font-size: 25px;
+}
+
+.modal-description {
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.modal-description strong {
+  color: var(--color-text);
+}
+
+.reserve-button,
+.cancel-modal-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 44px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.reserve-button {
+  margin-top: 22px;
+  color: white;
+  border: 0;
+  background: var(--color-primary);
+}
+
+.reserve-button:hover {
+  background: var(--color-primary-dark);
+}
+
+.cancel-modal-button {
+  margin-top: 10px;
+  color: #475569;
+  border: 1px solid var(--color-border);
+  background: white;
+}
+
+@media (max-width: 1100px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .locker-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .locker-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .locker-search {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .dashboard-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dashboard-date {
+    align-self: flex-start;
+  }
+
+  .stats-grid {
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 15px;
+  }
+
+  .stat-value {
+    font-size: 26px;
+  }
+
+  .locker-section {
+    padding: 17px 12px;
+  }
+
+  .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .locker-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .locker-filters {
+    gap: 3px;
+  }
+
+  .filter-button {
+    padding: 8px;
+    font-size: 10px;
+  }
+
+  .locker-footer {
+    flex-direction: column;
+  }
+}
+
+
+/* Formulario de reserva dentro del modal */
+.locker-modal form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  gap: 14px;
+  margin-top: 18px;
+  text-align: left;
+}
+
+.locker-modal .reservation-form-label {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.locker-modal .reservation-form-label input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.locker-modal .reservation-form-label input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 10%);
+}
+
+.locker-modal .reservation-form-label input::placeholder {
+  color: #94a3b8;
+}
+
+/* Botón del formulario */
+.locker-modal form .reserve-button {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 46px;
+  margin: 4px 0 0;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.locker-modal form .reserve-button:hover:not(:disabled) {
+  background: var(--color-primary-dark);
+}
+
+.locker-modal form .reserve-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Evitar que el modal se desborde en móviles */
+.locker-modal {
+  box-sizing: border-box;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+
+@media (max-width: 480px) {
+  .modal-backdrop {
+    padding: 12px;
+  }
+
+  .locker-modal {
+    padding: 24px 18px;
+    max-width: 100%;
+  }
+
+  .locker-modal h2 {
+    font-size: 22px;
+  }
+}
+
+
+/* Modal de casillero */
+.locker-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  max-width: 390px;
+  max-height: calc(100vh - 40px);
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: 30px;
+  text-align: center;
+}
+
+/* El icono es independiente del formulario */
+.locker-modal > .modal-icon {
+  flex: 0 0 58px;
+  align-self: center;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 17px;
+}
+
+/* Formulario en columna */
+.locker-modal .reservation-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  width: 100%;
+  margin: 18px 0 8px;
+  text-align: left;
+}
+
+.locker-modal .reservation-form .modal-description {
+  margin: 0;
+}
+
+.locker-modal .reservation-form-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.locker-modal .reservation-form-label input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--color-text);
+  font: inherit;
+}
+
+.locker-modal .reservation-form-label input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 10%);
+}
+
+.locker-modal .reservation-form .reserve-button {
+  margin: 2px 0 0;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.locker-modal .cancel-modal-button {
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .locker-modal {
+    padding: 24px 18px;
+  }
+}

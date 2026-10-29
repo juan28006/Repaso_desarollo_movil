@@ -143,30 +143,57 @@ export const crearServicios = ({ repo, config, reloj = () => new Date() }) => {
       return { reserva: serializar(actor, id, resultado.reserva), creada: resultado.creada };
     },
 
+    
     async cancelar(actor, reservaId) {
       return repo.transaccion(async (tx) => {
         const reserva = await tx.obtenerReserva(reservaId);
-        if (!reserva) throw conflictoOperacion('La reserva ya no existe.');
-        if (!esPersonal(actor.rol) && reserva.usuarioId !== actor.uid) {
+
+        if (!reserva) {
+          throw conflictoOperacion('La reserva ya no existe.');
+        }
+
+        // El estudiante solamente puede cancelar su propia reserva.
+        if (
+          !esPersonal(actor.rol) &&
+          reserva.usuarioId !== actor.uid
+        ) {
           throw prohibido('No tienes permiso para cancelar esta reserva.');
         }
-        if (reserva.estado === 'cancelada') return serializar(actor, reservaId, reserva);
+
+        // Repetir una cancelación no modifica nuevamente la reserva.
+        if (reserva.estado === 'cancelada') {
+          return serializar(actor, reservaId, reserva);
+        }
+
         if (!puedeCancelar(reserva, actor.rol, off, reloj())) {
           throw conflictoOperacion(
-            esPersonal(actor.rol)
-              ? 'La reserva ya terminó y no se puede liberar el casillero.'
-              : 'Ya inició el uso o la reserva no se puede cancelar.'
+            actor.rol === ROLES.ADMINISTRADOR
+              ? 'No se puede cancelar esta reserva.'
+              : esPersonal(actor.rol)
+                ? 'La reserva ya terminó y no se puede liberar el casillero.'
+                : 'La reserva ya comenzó o no se puede cancelar.'
           );
         }
+
+        const ahora = reloj().toISOString();
+
         const cambios = {
           estado: 'cancelada',
-          cancelledAt: reloj().toISOString(),
+          cancelledAt: ahora,
           canceladaPor: actor.uid,
+          gestionadoPor: actor.uid,
+          updatedAt: ahora,
         };
+
         await tx.actualizarReserva(reservaId, cambios);
-        return serializar(actor, reservaId, { ...reserva, ...cambios });
+
+        return serializar(actor, reservaId, {
+          ...reserva,
+          ...cambios,
+        });
       });
     },
+
 
     async iniciarUso(actor, reservaId) {
       return repo.transaccion(async (tx) => {
@@ -206,7 +233,16 @@ export const crearServicios = ({ repo, config, reloj = () => new Date() }) => {
           && (!estadoVisible || r.estadoVisible === estadoVisible)
           && (!zonaId || r.zonaId === zonaId)
           && (!correo || String(r.usuarioEmail).toLowerCase().includes(correo)))
-        .sort((a, b) => (b.fecha + b.franja).localeCompare(a.fecha + a.franja));
+        .sort((a, b) => {
+          const fechaA = String(a.fecha ?? '');
+          const fechaB = String(b.fecha ?? '');
+          const franjaA = String(a.franja ?? '');
+          const franjaB = String(b.franja ?? '');
+
+          return `${fechaB}_${franjaB}`.localeCompare(
+            `${fechaA}_${franjaA}`
+          );
+        });
     },
 
     async listarUsuarios() {
@@ -230,6 +266,70 @@ export const crearServicios = ({ repo, config, reloj = () => new Date() }) => {
       if (!perfil) throw noEncontrado('El usuario no existe.');
       await repo.actualizarUsuario(uid, { rol });
       return { uid, email: perfil.correo, nombreCompleto: perfil.nombreCompleto || null, rol };
+    },
+        async actualizarUsuario(actor, uid, body = {}) {
+      if (uid === actor.uid) {
+        throw prohibido('No puedes editar tu propio perfil desde esta sección.');
+      }
+
+      const perfil = await repo.obtenerUsuario(uid);
+      if (!perfil) throw noEncontrado('El usuario no existe.');
+
+      const camposPermitidos = [
+        'nombreCompleto',
+        'cedula',
+        'telefono',
+        'direccion',
+      ];
+
+      const cambios = {};
+      for (const campo of camposPermitidos) {
+        if (Object.hasOwn(body, campo)) {
+          cambios[campo] = texto(body[campo]);
+          if (!cambios[campo]) {
+            throw invalido(`El campo ${campo} no puede estar vacío.`);
+          }
+        }
+      }
+
+      if (Object.keys(cambios).length === 0) {
+        throw invalido('No se proporcionaron datos para actualizar.');
+      }
+
+      if (cambios.cedula && !/^\d{6,12}$/.test(cambios.cedula)) {
+        throw invalido('La cédula debe tener entre 6 y 12 dígitos.');
+      }
+
+      if (cambios.telefono && !/^\d{7,15}$/.test(cambios.telefono)) {
+        throw invalido('El teléfono debe tener entre 7 y 15 dígitos.');
+      }
+
+      await repo.actualizarUsuario(uid, cambios);
+
+      return {
+        uid,
+        email: perfil.correo,
+        nombreCompleto: cambios.nombreCompleto ?? perfil.nombreCompleto ?? null,
+        cedula: cambios.cedula ?? perfil.cedula ?? null,
+        telefono: cambios.telefono ?? perfil.telefono ?? null,
+        direccion: cambios.direccion ?? perfil.direccion ?? null,
+        rol: perfil.rol || rolInicial(perfil.correo),
+      };
+    },
+
+    async eliminarUsuario(actor, uid, auth) {
+      if (uid === actor.uid) {
+        throw prohibido('No puedes eliminar tu propia cuenta desde esta sección.');
+      }
+
+      const perfil = await repo.obtenerUsuario(uid);
+      if (!perfil) throw noEncontrado('El usuario no existe.');
+
+      // Eliminar la cuenta de autenticación y su perfil.
+      await auth.eliminarUsuario(uid);
+      await repo.eliminarUsuario(uid);
+
+      return { mensaje: 'Usuario eliminado correctamente.', uid };
     },
   };
 };

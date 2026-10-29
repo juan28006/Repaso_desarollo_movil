@@ -18,6 +18,9 @@ export const crearRepoFirestore = (app) => {
     async actualizarUsuario(uid, cambios) {
       await db.collection('users').doc(uid).set(cambios, { merge: true });
     },
+    async eliminarUsuario(uid) {
+      await db.collection('users').doc(uid).delete();
+    },
     async buscarUsuarioPorCorreo(correo) {
       const snap = await db.collection('users').where('correo', '==', correo).limit(1).get();
       if (snap.empty) return null;
