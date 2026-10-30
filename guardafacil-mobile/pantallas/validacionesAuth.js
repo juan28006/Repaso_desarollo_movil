@@ -10,7 +10,7 @@ export function validarRegistro(datos) {
   if (!/^\d{7,15}$/.test(datos.telefono.trim())) errores.telefono = 'Usa solo números (entre 7 y 15 dígitos).';
   if (!validarCorreo(datos.correo)) errores.correo = 'Escribe un correo válido.';
   if (!datos.direccion.trim()) errores.direccion = 'Escribe tu dirección.';
-  if (datos.contrasena.length < 6) errores.contrasena = 'Usa al menos 6 caracteres.';
+  if (datos.contrasena.length < 8) errores.contrasena = 'Usa al menos 8 caracteres.';
   if (datos.confirmarContrasena !== datos.contrasena) errores.confirmarContrasena = 'Las contraseñas no coinciden.';
 
   return errores;

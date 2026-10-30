@@ -14,3 +14,13 @@ export const cambiarRolUsuario = async (usuarioId, uidObjetivo, rol) => {
   validarSesion(usuarioId);
   return peticion('PATCH', `/usuarios/${encodeURIComponent(uidObjetivo)}/rol`, { cuerpo: { rol } });
 };
+
+export const actualizarUsuario = async (usuarioId, uidObjetivo, cambios) => {
+  validarSesion(usuarioId);
+  return peticion('PATCH', `/usuarios/${encodeURIComponent(uidObjetivo)}`, { cuerpo: cambios });
+};
+
+export const eliminarUsuario = async (usuarioId, uidObjetivo) => {
+  validarSesion(usuarioId);
+  return peticion('DELETE', `/usuarios/${encodeURIComponent(uidObjetivo)}`);
+};

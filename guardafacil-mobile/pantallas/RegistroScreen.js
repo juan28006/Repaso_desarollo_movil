@@ -71,11 +71,13 @@ export default function RegistroScreen({ navigation }) {
               autoCapitalize={campo === 'correo' || campo.includes('contrasena') ? 'none' : 'words'}
               keyboardType={campo === 'cedula' || campo === 'telefono' ? 'phone-pad' : campo === 'correo' ? 'email-address' : 'default'}
               onChangeText={(valor) => actualizarCampo(campo, valor)}
+              placeholder={campo === 'contrasena' ? 'Mínimo 8 caracteres' : undefined}
               secureTextEntry={campo.includes('contrasena')}
               style={[styles.input, errores[campo] && styles.inputError]}
               value={datos[campo]}
             />
             {!!errores[campo] && <Text style={styles.error}>{errores[campo]}</Text>}
+            {campo === 'contrasena' && <Text style={styles.help}>Usa al menos 8 caracteres.</Text>}
           </View>
         ))}
 
@@ -105,6 +107,7 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#fff', borderColor: '#d2d8ed', borderRadius: 12, borderWidth: 1, color: '#172044', fontSize: 16, minHeight: 52, paddingHorizontal: 15 },
   inputError: { borderColor: '#c64051' },
   error: { color: '#b52f43', fontSize: 13, marginTop: 5 },
+  help: { color: '#69728e', fontSize: 13, marginTop: 5 },
   generalError: { color: '#b52f43', fontSize: 14, marginBottom: 14 },
   button: { alignItems: 'center', backgroundColor: '#273c9c', borderRadius: 12, justifyContent: 'center', minHeight: 54, marginTop: 8 },
   disabledButton: { opacity: 0.65 },

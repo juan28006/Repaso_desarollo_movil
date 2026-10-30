@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -20,12 +21,23 @@ import { obtenerTodasLasReservas } from '../services/gestionService';
 import { ejecutarOEncolar, obtenerColaOffline } from '../services/offlineQueueService';
 import { aplicarColaAReservas, etiquetaOperacionLocal } from '../services/estadoColaReserva';
 import { puedeCancelarReserva } from '../services/reglasReserva';
-import { obtenerEstadoReserva } from '../constantes/estadosReserva';
+import { ESTADOS_RESERVA, obtenerEstadoReserva } from '../constantes/estadosReserva';
 
 const FILTROS = [
   { id: 'vigentes', texto: 'Vigentes' },
   { id: 'todas', texto: 'Todas' },
 ];
+
+const claveFechaValida = (valor) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;
+  const fecha = new Date(`${valor}T12:00:00`);
+  const mes = Number(valor.slice(5, 7));
+  const dia = Number(valor.slice(8, 10));
+  return !Number.isNaN(fecha.getTime())
+    && fecha.getFullYear() === Number(valor.slice(0, 4))
+    && fecha.getMonth() + 1 === mes
+    && fecha.getDate() === dia;
+};
 
 export default function GestionReservasScreen({ navigation }) {
   const { usuario } = useAuthContexto();
@@ -38,6 +50,9 @@ export default function GestionReservasScreen({ navigation }) {
   const [error, setError] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [filtro, setFiltro] = useState('vigentes');
+  const [estadoSeleccionado, setEstadoSeleccionado] = useState('todos');
+  const [fechaFiltro, setFechaFiltro] = useState('');
+  const [reservaDetalle, setReservaDetalle] = useState(null);
   const [liberandoId, setLiberandoId] = useState(null);
 
   const cargar = useCallback(async (mostrarCarga = true) => {
@@ -73,12 +88,31 @@ export default function GestionReservasScreen({ navigation }) {
     const texto = busqueda.trim().toLowerCase();
     return reservas.filter((reserva) => {
       const estado = obtenerEstadoReserva(reserva);
-      if (filtro === 'vigentes' && !['reservado', 'en_uso'].includes(estado)) return false;
+      if (
+        filtro === 'vigentes'
+        && estadoSeleccionado === 'todos'
+        && !['reservado', 'en_uso'].includes(estado)
+      ) return false;
+      if (estadoSeleccionado !== 'todos' && estado !== estadoSeleccionado) return false;
+      if (fechaFiltro && !claveFechaValida(fechaFiltro)) return false;
+      if (fechaFiltro && reserva.fecha !== fechaFiltro) return false;
       if (!texto) return true;
-      return [reserva.usuarioEmail, reserva.casilleroNumero, reserva.zonaNombre]
+      return [
+        reserva.usuarioEmail,
+        reserva.casilleroNumero,
+        reserva.casilleroId,
+        reserva.zonaNombre,
+        reserva.zonaId,
+      ]
         .some((campo) => String(campo || '').toLowerCase().includes(texto));
     });
-  }, [reservas, busqueda, filtro]);
+  }, [reservas, busqueda, filtro, estadoSeleccionado, fechaFiltro]);
+
+  const estadisticas = useMemo(() => Object.entries(ESTADOS_RESERVA).map(([estado, datos]) => ({
+    estado,
+    etiqueta: datos.etiqueta,
+    total: reservas.filter((reserva) => obtenerEstadoReserva(reserva) === estado).length,
+  })), [reservas]);
 
   const refrescar = async () => {
     setActualizando(true);
@@ -183,6 +217,68 @@ export default function GestionReservasScreen({ navigation }) {
           autoCorrect={false}
         />
 
+        <Text style={styles.etiquetaFiltro}>Fecha</Text>
+        <View style={styles.filaFecha}>
+          <TextInput
+            accessibilityLabel="Filtrar reservas por fecha"
+            autoCapitalize="none"
+            keyboardType="numbers-and-punctuation"
+            onChangeText={setFechaFiltro}
+            placeholder="AAAA-MM-DD"
+            style={styles.fechaInput}
+            value={fechaFiltro}
+          />
+          {!!fechaFiltro && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setFechaFiltro('')}
+              style={styles.limpiarFecha}
+            >
+              <Text style={styles.limpiarFechaTexto}>Limpiar</Text>
+            </Pressable>
+          )}
+        </View>
+        {fechaFiltro && !claveFechaValida(fechaFiltro) ? (
+          <Text style={styles.errorFiltro}>Usa el formato AAAA-MM-DD.</Text>
+        ) : null}
+
+        <Text style={styles.etiquetaFiltro}>Estado</Text>
+        <View style={styles.filtrosEstado}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: estadoSeleccionado === 'todos' }}
+            onPress={() => setEstadoSeleccionado('todos')}
+            style={[styles.chipEstado, estadoSeleccionado === 'todos' && styles.chipEstadoActivo]}
+          >
+            <Text style={[styles.chipEstadoTexto, estadoSeleccionado === 'todos' && styles.chipEstadoTextoActivo]}>
+              Todos
+            </Text>
+          </Pressable>
+          {Object.entries(ESTADOS_RESERVA).map(([estado, datos]) => (
+            <Pressable
+              key={estado}
+              accessibilityRole="button"
+              accessibilityState={{ selected: estadoSeleccionado === estado }}
+              onPress={() => setEstadoSeleccionado(estado)}
+              style={[styles.chipEstado, estadoSeleccionado === estado && styles.chipEstadoActivo]}
+            >
+              <Text style={[styles.chipEstadoTexto, estadoSeleccionado === estado && styles.chipEstadoTextoActivo]}>
+                {datos.etiqueta}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={styles.etiquetaFiltro}>Totales por estado</Text>
+        <View style={styles.estadisticas}>
+          {estadisticas.map(({ estado, etiqueta, total }) => (
+            <View key={estado} style={styles.estadistica}>
+              <Text style={styles.estadisticaNumero}>{total}</Text>
+              <Text style={styles.estadisticaEtiqueta}>{etiqueta}</Text>
+            </View>
+          ))}
+        </View>
+
         <View style={styles.pestanas}>
           {FILTROS.map((opcion) => (
             <Pressable
@@ -223,6 +319,13 @@ export default function GestionReservasScreen({ navigation }) {
               <Text style={styles.detalle}>{reserva.zonaNombre || 'Zona'}</Text>
               <Text style={styles.detalle}>{reserva.fecha} · {reserva.franja}</Text>
               <Text style={styles.detalle}>Reservado por: {reserva.usuarioEmail}</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setReservaDetalle(reserva)}
+                style={styles.botonVerDetalle}
+              >
+                <Text style={styles.botonVerDetalleTexto}>Ver detalle</Text>
+              </Pressable>
               {!!etiquetaOperacionLocal(reserva) && (
                 <Text style={styles.detallePendiente}>{etiquetaOperacionLocal(reserva)}</Text>
               )}
@@ -245,6 +348,45 @@ export default function GestionReservasScreen({ navigation }) {
           );
         })}
       </ScrollView>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setReservaDetalle(null)}
+        transparent
+        visible={Boolean(reservaDetalle)}
+      >
+        <View style={styles.modalFondo}>
+          <View style={styles.modalContenido}>
+            <ScrollView>
+              <Text style={styles.modalTitulo}>Detalle de reserva</Text>
+              {reservaDetalle && (
+                <>
+                  <Text style={styles.modalDato}>
+                    Estado: {ESTADOS_RESERVA[obtenerEstadoReserva(reservaDetalle)]?.etiqueta || 'Reservado'}
+                  </Text>
+                  <Text style={styles.modalDato}>Casillero: {reservaDetalle.casilleroNumero || reservaDetalle.casilleroId}</Text>
+                  <Text style={styles.modalDato}>Zona: {reservaDetalle.zonaNombre || reservaDetalle.zonaId || 'No disponible'}</Text>
+                  <Text style={styles.modalDato}>Fecha: {reservaDetalle.fecha || 'No disponible'}</Text>
+                  <Text style={styles.modalDato}>Franja: {reservaDetalle.franja || 'No disponible'}</Text>
+                  <Text style={styles.modalDato}>Correo: {reservaDetalle.usuarioEmail || 'No disponible'}</Text>
+                  <Text style={styles.modalDato}>ID de reserva: {reservaDetalle.id}</Text>
+                  {!!reservaDetalle.createdAt && (
+                    <Text style={styles.modalDato}>Creada: {reservaDetalle.createdAt}</Text>
+                  )}
+                  {!!etiquetaOperacionLocal(reservaDetalle) && (
+                    <Text style={styles.detallePendiente}>{etiquetaOperacionLocal(reservaDetalle)}</Text>
+                  )}
+                  {reservaDetalle.cancelacionPendiente && (
+                    <Text style={styles.detallePendiente}>Liberación pendiente de validación</Text>
+                  )}
+                </>
+              )}
+            </ScrollView>
+            <Pressable onPress={() => setReservaDetalle(null)} style={styles.botonCerrarModal}>
+              <Text style={styles.botonCerrarTexto}>Cerrar</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -276,6 +418,44 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     fontSize: 15,
   },
+  etiquetaFiltro: { color: '#2e385b', fontSize: 14, fontWeight: '700', marginBottom: 8 },
+  filaFecha: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  limpiarFecha: { padding: 10 },
+  limpiarFechaTexto: { color: '#273c9c', fontSize: 14, fontWeight: '700' },
+  fechaInput: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderColor: '#d2d8ed',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 15,
+  },
+  errorFiltro: { color: '#c0392b', fontSize: 13, marginTop: -10, marginBottom: 12 },
+  filtrosEstado: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  chipEstado: {
+    borderColor: '#d2d8ed',
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+  },
+  chipEstadoActivo: { backgroundColor: '#273c9c', borderColor: '#273c9c' },
+  chipEstadoTexto: { color: '#273c9c', fontSize: 13, fontWeight: '700' },
+  chipEstadoTextoActivo: { color: '#fff' },
+  estadisticas: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
+  estadistica: {
+    backgroundColor: '#fff',
+    borderColor: '#d2d8ed',
+    borderWidth: 1,
+    borderRadius: 10,
+    minWidth: '30%',
+    padding: 10,
+  },
+  estadisticaNumero: { color: '#273c9c', fontSize: 18, fontWeight: '800' },
+  estadisticaEtiqueta: { color: '#69728e', fontSize: 12, marginTop: 2 },
   pestanas: {
     flexDirection: 'row',
     backgroundColor: '#e8ecf8',
@@ -305,6 +485,8 @@ const styles = StyleSheet.create({
   casillero: { color: '#172044', fontSize: 17, fontWeight: '800', flexShrink: 1 },
   detalle: { color: '#69728e', fontSize: 14, marginTop: 4 },
   detallePendiente: { color: '#9b6400', fontSize: 13, fontWeight: '700', marginTop: 8 },
+  botonVerDetalle: { alignSelf: 'flex-start', marginTop: 10, paddingVertical: 6 },
+  botonVerDetalleTexto: { color: '#273c9c', fontSize: 14, fontWeight: '700' },
   botonLiberar: {
     alignItems: 'center',
     borderColor: '#e74c3c',
@@ -328,4 +510,22 @@ const styles = StyleSheet.create({
   errorTexto: { color: '#c0392b', fontSize: 15, textAlign: 'center' },
   reintentar: { marginTop: 16, padding: 10 },
   reintentarTexto: { color: '#273c9c', fontSize: 15, fontWeight: '700' },
+  modalFondo: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(23, 32, 68, 0.45)',
+    padding: 20,
+  },
+  modalContenido: { backgroundColor: '#fff', borderRadius: 16, maxHeight: '85%', padding: 20 },
+  modalTitulo: { color: '#172044', fontSize: 22, fontWeight: '800', marginBottom: 16 },
+  modalDato: { color: '#2e385b', fontSize: 15, marginBottom: 10 },
+  botonCerrarModal: {
+    alignItems: 'center',
+    backgroundColor: '#273c9c',
+    borderRadius: 10,
+    justifyContent: 'center',
+    minHeight: 46,
+    marginTop: 16,
+  },
+  botonCerrarTexto: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });
